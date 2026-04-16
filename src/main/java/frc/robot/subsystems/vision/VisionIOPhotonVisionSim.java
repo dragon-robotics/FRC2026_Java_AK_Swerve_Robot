@@ -7,15 +7,16 @@
 
 package frc.robot.subsystems.vision;
 
-import static frc.robot.util.constants.FieldConstants.APTAG_FIELD_LAYOUT;
+import java.util.function.Supplier;
+
+import org.photonvision.simulation.PhotonCameraSim;
+import org.photonvision.simulation.SimCameraProperties;
+import org.photonvision.simulation.VisionSystemSim;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform3d;
-import java.util.function.Supplier;
-import org.photonvision.simulation.PhotonCameraSim;
-import org.photonvision.simulation.SimCameraProperties;
-import org.photonvision.simulation.VisionSystemSim;
+import static frc.robot.util.constants.FieldConstants.APTAG_FIELD_LAYOUT;
 
 /** IO implementation for physics sim using PhotonVision simulator. */
 public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
