@@ -7,12 +7,11 @@
 
 package frc.robot.subsystems.vision;
 
-import static frc.robot.util.constants.FieldConstants.*;
+import static frc.robot.util.constants.FieldConstants.APTAG_FIELD_LAYOUT;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform3d;
-
 import java.util.function.Supplier;
 import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
@@ -37,8 +36,10 @@ public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
     this.poseSupplier = poseSupplier;
 
     // Initialize vision sim
-    visionSim = new VisionSystemSim("main");
-    visionSim.addAprilTags(APTAG_FIELD_LAYOUT);
+    if (visionSim == null) {
+      visionSim = new VisionSystemSim("main");
+      visionSim.addAprilTags(APTAG_FIELD_LAYOUT);
+    }
 
     // Add sim camera
     var cameraProperties = new SimCameraProperties();
@@ -47,7 +48,7 @@ public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
     cameraProperties.setFPS(60);
     cameraProperties.setAvgLatencyMs(10);
     cameraProperties.setLatencyStdDevMs(5);
-
+    
     cameraSim = new PhotonCameraSim(camera, cameraProperties, APTAG_FIELD_LAYOUT);
 
     visionSim.addCamera(cameraSim, robotToCamera);

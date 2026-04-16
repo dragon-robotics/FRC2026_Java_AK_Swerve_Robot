@@ -21,7 +21,6 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 import frc.robot.util.constants.FieldConstants;
-
 import java.util.LinkedList;
 import java.util.List;
 import org.littletonrobotics.junction.Logger;
@@ -98,7 +97,8 @@ public class Vision extends SubsystemBase {
         boolean rejectPose =
             observation.tagCount() == 0 // Must have at least one tag
                 || (observation.tagCount() == 1
-                    && observation.ambiguity() > VisionConstants.SINGLE_TAG_MAX_AMBIGUITY) // Cannot be high ambiguity
+                    && observation.ambiguity()
+                        > VisionConstants.SINGLE_TAG_MAX_AMBIGUITY) // Cannot be high ambiguity
                 || Math.abs(observation.pose().getZ())
                     > VisionConstants.MAX_Z_ERROR // Must have realistic Z coordinate
 

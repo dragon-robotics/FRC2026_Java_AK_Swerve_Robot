@@ -9,23 +9,6 @@ package frc.robot;
 
 import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import static frc.robot.util.constants.GeneralConstants.*;
-import static frc.robot.util.constants.HopperConstants.HOPPER_ROLLER_FOLLOW_MOTOR_ID;
-import static frc.robot.util.constants.HopperConstants.HOPPER_ROLLER_FOLLOW_TALONFX_CONFIG;
-import static frc.robot.util.constants.HopperConstants.HOPPER_ROLLER_LEAD_MOTOR_ID;
-import static frc.robot.util.constants.HopperConstants.HOPPER_ROLLER_LEAD_TALONFX_CONFIG;
-import static frc.robot.util.constants.IntakeConstants.INTAKE_ARM_CANCODER_CONFIG;
-import static frc.robot.util.constants.IntakeConstants.INTAKE_ARM_MOTOR_ID;
-import static frc.robot.util.constants.IntakeConstants.INTAKE_ARM_TALONFX_CONFIG;
-import static frc.robot.util.constants.IntakeConstants.INTAKE_ROLLER_MOTOR_ID;
-import static frc.robot.util.constants.IntakeConstants.INTAKE_ROLLER_TALONFX_CONFIG;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_FOLLOW_MOTOR_ID;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_FOLLOW_TALONFX_CONFIG;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_HOOD_MOTOR_ID;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_HOOD_TALONFX_CONFIG;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_KICKER_MOTOR_ID;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_KICKER_TALONFX_CONFIG;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_LEAD_MOTOR_ID;
-import static frc.robot.util.constants.ShooterConstants.SHOOTER_LEAD_TALONFX_CONFIG;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -49,7 +32,6 @@ import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
-
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -83,16 +65,17 @@ public class RobotContainer {
                 new ModuleIOTalonFX(TunerConstants.FrontRight),
                 new ModuleIOTalonFX(TunerConstants.BackLeft),
                 new ModuleIOTalonFX(TunerConstants.BackRight));
-        vision = new Vision(
-            drive::addVisionMeasurement,
-            new VisionIOPhotonVision(
-                APTAG_CAMERA_NAMES[0], VisionConstants.APTAG_POSE_EST_CAM_F_POS),
-            new VisionIOPhotonVision(
-                APTAG_CAMERA_NAMES[1], VisionConstants.APTAG_POSE_EST_CAM_R_POS),
-            new VisionIOPhotonVision(
-                APTAG_CAMERA_NAMES[2], VisionConstants.APTAG_POSE_EST_CAM_B_POS),
-            new VisionIOPhotonVision(
-                APTAG_CAMERA_NAMES[3], VisionConstants.APTAG_POSE_EST_CAM_L_POS));
+        vision =
+            new Vision(
+                drive::addVisionMeasurement,
+                new VisionIOPhotonVision(
+                    APTAG_CAMERA_NAMES[0], VisionConstants.APTAG_POSE_EST_CAM_F_POS),
+                new VisionIOPhotonVision(
+                    APTAG_CAMERA_NAMES[1], VisionConstants.APTAG_POSE_EST_CAM_R_POS),
+                new VisionIOPhotonVision(
+                    APTAG_CAMERA_NAMES[2], VisionConstants.APTAG_POSE_EST_CAM_B_POS),
+                new VisionIOPhotonVision(
+                    APTAG_CAMERA_NAMES[3], VisionConstants.APTAG_POSE_EST_CAM_L_POS));
         break;
 
       case SIM:
@@ -104,16 +87,25 @@ public class RobotContainer {
                 new ModuleIOSim(TunerConstants.FrontRight),
                 new ModuleIOSim(TunerConstants.BackLeft),
                 new ModuleIOSim(TunerConstants.BackRight));
-        vision = new Vision(
-            drive::addVisionMeasurement,
-            new VisionIOPhotonVisionSim(
-                APTAG_CAMERA_NAMES[0], VisionConstants.APTAG_POSE_EST_CAM_F_POS, drive::getPose),
-            new VisionIOPhotonVisionSim(
-                APTAG_CAMERA_NAMES[1], VisionConstants.APTAG_POSE_EST_CAM_R_POS, drive::getPose),
-            new VisionIOPhotonVisionSim(
-                APTAG_CAMERA_NAMES[2], VisionConstants.APTAG_POSE_EST_CAM_B_POS, drive::getPose),
-            new VisionIOPhotonVisionSim(
-                APTAG_CAMERA_NAMES[3], VisionConstants.APTAG_POSE_EST_CAM_L_POS, drive::getPose));                
+        vision =
+            new Vision(
+                drive::addVisionMeasurement,
+                new VisionIOPhotonVisionSim(
+                    APTAG_CAMERA_NAMES[0],
+                    VisionConstants.APTAG_POSE_EST_CAM_F_POS,
+                    drive::getPose),
+                new VisionIOPhotonVisionSim(
+                    APTAG_CAMERA_NAMES[1],
+                    VisionConstants.APTAG_POSE_EST_CAM_R_POS,
+                    drive::getPose),
+                new VisionIOPhotonVisionSim(
+                    APTAG_CAMERA_NAMES[2],
+                    VisionConstants.APTAG_POSE_EST_CAM_B_POS,
+                    drive::getPose),
+                new VisionIOPhotonVisionSim(
+                    APTAG_CAMERA_NAMES[3],
+                    VisionConstants.APTAG_POSE_EST_CAM_L_POS,
+                    drive::getPose));
         break;
 
       default:
