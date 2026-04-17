@@ -7,8 +7,9 @@
 
 package frc.robot.subsystems.drive;
 
-import edu.wpi.first.math.geometry.Rotation2d;
 import org.littletonrobotics.junction.AutoLog;
+
+import edu.wpi.first.math.geometry.Rotation2d;
 
 public interface ModuleIO {
   @AutoLog
@@ -46,4 +47,10 @@ public interface ModuleIO {
 
   /** Run the turn motor to the specified rotation. */
   public default void setTurnPosition(Rotation2d rotation) {}
+
+  /** Run the turn motor to the specified rotation using Motion Magic (trapezoidal profile). */
+  public default void setTurnPositionMotionMagic(Rotation2d rotation) {}
+
+  /** Run the turn motor to the specified rotation using Motion Magic Expo (exponential profile). */
+  public default void setTurnPositionMotionMagicExpo(Rotation2d rotation) {}
 }

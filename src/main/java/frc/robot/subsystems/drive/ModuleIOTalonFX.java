@@ -7,12 +7,16 @@
 
 package frc.robot.subsystems.drive;
 
-import static frc.robot.util.PhoenixUtil.*;
+import java.util.Queue;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.MotionMagicExpoTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.MotionMagicExpoVoltage;
+import com.ctre.phoenix6.controls.MotionMagicTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
@@ -27,6 +31,7 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
+
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
@@ -35,7 +40,7 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Voltage;
 import frc.robot.generated.TunerConstants;
-import java.util.Queue;
+import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
 /**
  * Module IO implementation for Talon FX drive motor controller, Talon FX turn motor controller, and
@@ -57,6 +62,8 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final VoltageOut voltageRequest = new VoltageOut(0);
   private final PositionVoltage positionVoltageRequest = new PositionVoltage(0.0);
   private final VelocityVoltage velocityVoltageRequest = new VelocityVoltage(0.0);
+  private final MotionMagicVoltage motionMagicPositionVoltageRequest = new MotionMagicVoltage(0.0);
+  private final MotionMagicExpoVoltage motionMagicExpoPositionVoltageRequest = new MotionMagicExpoVoltage(0.0);
 
   // Torque-current control requests
   private final TorqueCurrentFOC torqueCurrentRequest = new TorqueCurrentFOC(0);
@@ -64,6 +71,10 @@ public class ModuleIOTalonFX implements ModuleIO {
       new PositionTorqueCurrentFOC(0.0);
   private final VelocityTorqueCurrentFOC velocityTorqueCurrentRequest =
       new VelocityTorqueCurrentFOC(0.0);
+  private final MotionMagicTorqueCurrentFOC motionMagicPositionTorqueCurrentRequest =
+      new MotionMagicTorqueCurrentFOC(0.0);
+  private final MotionMagicExpoTorqueCurrentFOC motionMagicExpoPositionTorqueCurrentRequest =
+      new MotionMagicExpoTorqueCurrentFOC(0.0);
 
   // Timestamp inputs from Phoenix thread
   private final Queue<Double> timestampQueue;
@@ -258,6 +269,28 @@ public class ModuleIOTalonFX implements ModuleIO {
         switch (constants.SteerMotorClosedLoopOutput) {
           case Voltage -> positionVoltageRequest.withPosition(rotation.getRotations());
           case TorqueCurrentFOC -> positionTorqueCurrentRequest.withPosition(
+              rotation.getRotations());
+        });
+  }
+
+  @Override
+  public void setTurnPositionMotionMagic(Rotation2d rotation) {
+    turnTalon.setControl(
+        switch (constants.SteerMotorClosedLoopOutput) {
+          case Voltage -> motionMagicPositionVoltageRequest.withPosition(
+              rotation.getRotations());
+          case TorqueCurrentFOC -> motionMagicPositionTorqueCurrentRequest.withPosition(
+              rotation.getRotations());
+        });
+  }
+
+  @Override
+  public void setTurnPositionMotionMagicExpo(Rotation2d rotation) {
+    turnTalon.setControl(
+        switch (constants.SteerMotorClosedLoopOutput) {
+          case Voltage -> motionMagicExpoPositionVoltageRequest.withPosition(
+              rotation.getRotations());
+          case TorqueCurrentFOC -> motionMagicExpoPositionTorqueCurrentRequest.withPosition(
               rotation.getRotations());
         });
   }
