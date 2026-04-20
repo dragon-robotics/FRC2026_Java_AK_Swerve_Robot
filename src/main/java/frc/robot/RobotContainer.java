@@ -7,10 +7,9 @@
 
 package frc.robot;
 
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 
 import com.pathplanner.lib.auto.AutoBuilder;
-
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
@@ -27,12 +26,16 @@ import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.IntakeIO;
+import frc.robot.subsystems.intake.IntakeIOSim;
+import frc.robot.subsystems.intake.IntakeIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
-import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -44,6 +47,7 @@ public class RobotContainer {
   // Subsystems
   private final Drive drive;
   private final Vision vision;
+  private final Intake intake;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -76,6 +80,7 @@ public class RobotContainer {
                     APTAG_CAMERA_NAMES[2], VisionConstants.APTAG_POSE_EST_CAM_B_POS),
                 new VisionIOPhotonVision(
                     APTAG_CAMERA_NAMES[3], VisionConstants.APTAG_POSE_EST_CAM_L_POS));
+        intake = new Intake(new IntakeIOTalonFX());
         break;
 
       case SIM:
@@ -106,6 +111,7 @@ public class RobotContainer {
                     APTAG_CAMERA_NAMES[3],
                     VisionConstants.APTAG_POSE_EST_CAM_L_POS,
                     drive::getPose));
+        intake = new Intake(new IntakeIOSim());
         break;
 
       default:
@@ -118,6 +124,7 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {});
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
+        intake = new Intake(new IntakeIO() {});
         break;
     }
 
