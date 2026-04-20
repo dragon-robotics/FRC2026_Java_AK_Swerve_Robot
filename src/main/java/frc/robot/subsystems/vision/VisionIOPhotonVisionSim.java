@@ -12,6 +12,7 @@ import static frc.robot.util.constants.FieldConstants.APTAG_FIELD_LAYOUT;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.wpilibj.Timer;
 import java.util.function.Supplier;
 import org.photonvision.simulation.PhotonCameraSim;
 import org.photonvision.simulation.SimCameraProperties;
@@ -20,6 +21,7 @@ import org.photonvision.simulation.VisionSystemSim;
 /** IO implementation for physics sim using PhotonVision simulator. */
 public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
   private static VisionSystemSim visionSim;
+  private static double lastSimUpdateTimestamp = -1.0;
 
   private final Supplier<Pose2d> poseSupplier;
   private final PhotonCameraSim cameraSim;
@@ -56,7 +58,14 @@ public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
 
   @Override
   public void updateInputs(VisionIOInputs inputs) {
-    visionSim.update(poseSupplier.get());
+    // Only update the shared VisionSystemSim once per robot cycle.
+    // With 4 cameras sharing the same static sim, calling update() on every
+    // camera would re-render all cameras N times (16 renders instead of 4).
+    double now = Timer.getFPGATimestamp();
+    if (now != lastSimUpdateTimestamp) {
+      visionSim.update(poseSupplier.get());
+      lastSimUpdateTimestamp = now;
+    }
     super.updateInputs(inputs);
   }
 }

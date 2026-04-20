@@ -142,6 +142,18 @@ public final class VisionConstants {
   // cause vision to be permanently rejected — vision is needed to CORRECT drift.
   public static double MAX_POSE_DISCREPANCY_METERS = 2.0;
 
+  // Cross-camera consistency checks.
+  // If other cameras have recently accepted poses and a camera's observation
+  // disagrees with their consensus by more than this, the observation is rejected.
+  // Tighter than MAX_POSE_DISCREPANCY_METERS because all cameras observe the same
+  // robot — large inter-camera disagreement reliably signals a bad reading.
+  public static double MAX_CROSS_CAMERA_DISCREPANCY_METERS = 0.75;
+
+  // Maximum age (seconds) of another camera's last accepted pose to count toward
+  // the cross-camera consensus. Keeps the check from using stale data during
+  // periods when a camera temporarily loses sight of tags.
+  public static double CROSS_CAMERA_MAX_AGE_SECONDS = 0.3;
+
   // If the swerve odometry has drifted this far from a high-confidence vision
   // fix, the pose estimator is hard-reset to the vision pose to recover from
   // drift. Must be less than MAX_POSE_DISCREPANCY_METERS so the reseed fires
@@ -176,7 +188,7 @@ public final class VisionConstants {
     return Math.toDegrees(vFOV_half_rad * 2.0);
   }
 
-  public static double[] CAMERA_STDDEV_FACTORS = new double[] {1.0, 1.0};
+  public static double[] CAMERA_STDDEV_FACTORS = new double[] {1.0, 1.0, 1.0, 1.0};
 
   public static double LINEAR_STDDEV_MEGATAG2_FACTOR = 0.5;
   public static double ANGULAR_STDDEV_MEGATAG2_ANGLE_FACTOR = Double.POSITIVE_INFINITY;

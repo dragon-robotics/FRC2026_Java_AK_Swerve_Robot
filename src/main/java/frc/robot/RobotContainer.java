@@ -47,6 +47,7 @@ import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import frc.robot.util.constants.OperatorConstants;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -65,8 +66,10 @@ public class RobotContainer {
   private final Superstructure superstructure;
 
   // Controllers
-  private final CommandXboxController driverController = new CommandXboxController(0);
-  private final CommandXboxController operatorController = new CommandXboxController(1);
+  private final CommandXboxController driverController =
+      new CommandXboxController(OperatorConstants.DRIVER_PORT);
+  private final CommandXboxController operatorController =
+      new CommandXboxController(OperatorConstants.OPERATOR_PORT);
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -88,6 +91,7 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
+                drive::getPose,
                 new VisionIOPhotonVision(
                     APTAG_CAMERA_NAMES[0], VisionConstants.APTAG_POSE_EST_CAM_F_POS),
                 new VisionIOPhotonVision(
@@ -113,6 +117,7 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
+                drive::getPose,
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[0],
                     VisionConstants.APTAG_POSE_EST_CAM_F_POS,
@@ -143,7 +148,9 @@ public class RobotContainer {
                 new ModuleIO() {},
                 new ModuleIO() {},
                 new ModuleIO() {});
-        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
+        vision =
+            new Vision(
+                drive::addVisionMeasurement, drive::getPose, new VisionIO() {}, new VisionIO() {});
         intake = new Intake(new IntakeIO() {});
         hopper = new Hopper(new HopperIO() {});
         shooter = new Shooter(new ShooterIO() {});
