@@ -212,6 +212,7 @@ public class DriveCommands {
     // Mutable state for use inside lambda
     Rotation2d[] headingSetpoint = {Rotation2d.kZero};
     boolean[] isLocked = {false};
+    boolean[] wasZoneLocked = {false};
 
     return Commands.run(
             () -> {
@@ -232,6 +233,14 @@ public class DriveCommands {
               Optional<Rotation2d> zoneLock = zoneLockHeadingSupplier.get();
 
               if (zoneLock.isPresent()) {
+                if (!wasZoneLocked[0]) {
+                  // Just entered zone lock — reset controller from current state
+                  // so it profiles smoothly to the target instead of from stale state
+                  angleController.reset(
+                      new TrapezoidProfile.State(
+                          drive.getRotation().getRadians(), drive.getAngularVelocityRadPerSec()));
+                  wasZoneLocked[0] = true;
+                }
                 // Zone lock active — override heading with zone target
                 omega =
                     angleController.calculate(
@@ -241,6 +250,7 @@ public class DriveCommands {
                 // Driver is commanding rotation — use their input directly
                 omega *= drive.getMaxAngularSpeedRadPerSec();
                 isLocked[0] = false;
+                wasZoneLocked[0] = false;
               } else if (!isLocked[0]) {
                 // Wait for robot to settle before locking heading
                 double angularVelocity = drive.getAngularVelocityRadPerSec();

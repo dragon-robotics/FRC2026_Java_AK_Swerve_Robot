@@ -180,7 +180,6 @@ public class Superstructure extends SubsystemBase {
 
   public void setDesiredSuperState(SuperState state) {
     this.state = state;
-    Logger.recordOutput("Superstructure/State", state.name());
   }
 
   /**
