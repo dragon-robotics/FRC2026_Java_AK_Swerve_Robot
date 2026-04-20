@@ -20,16 +20,25 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
+import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIOPigeon2;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOTalonFX;
+import frc.robot.subsystems.hopper.Hopper;
+import frc.robot.subsystems.hopper.HopperIO;
+import frc.robot.subsystems.hopper.HopperIOSim;
+import frc.robot.subsystems.hopper.HopperIOTalonFX;
 import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.intake.IntakeIO;
 import frc.robot.subsystems.intake.IntakeIOSim;
 import frc.robot.subsystems.intake.IntakeIOTalonFX;
+import frc.robot.subsystems.shooter.Shooter;
+import frc.robot.subsystems.shooter.ShooterIO;
+import frc.robot.subsystems.shooter.ShooterIOSim;
+import frc.robot.subsystems.shooter.ShooterIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionIO;
@@ -48,6 +57,9 @@ public class RobotContainer {
   private final Drive drive;
   private final Vision vision;
   private final Intake intake;
+  private final Hopper hopper;
+  private final Shooter shooter;
+  private final Superstructure superstructure;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -81,6 +93,8 @@ public class RobotContainer {
                 new VisionIOPhotonVision(
                     APTAG_CAMERA_NAMES[3], VisionConstants.APTAG_POSE_EST_CAM_L_POS));
         intake = new Intake(new IntakeIOTalonFX());
+        hopper = new Hopper(new HopperIOTalonFX());
+        shooter = new Shooter(new ShooterIOTalonFX());
         break;
 
       case SIM:
@@ -112,6 +126,8 @@ public class RobotContainer {
                     VisionConstants.APTAG_POSE_EST_CAM_L_POS,
                     drive::getPose));
         intake = new Intake(new IntakeIOSim());
+        hopper = new Hopper(new HopperIOSim());
+        shooter = new Shooter(new ShooterIOSim());
         break;
 
       default:
@@ -125,8 +141,13 @@ public class RobotContainer {
                 new ModuleIO() {});
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         intake = new Intake(new IntakeIO() {});
+        hopper = new Hopper(new HopperIO() {});
+        shooter = new Shooter(new ShooterIO() {});
         break;
     }
+
+    // Create superstructure coordinator (after all subsystems are initialized)
+    superstructure = new Superstructure(drive, intake, hopper, shooter);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
