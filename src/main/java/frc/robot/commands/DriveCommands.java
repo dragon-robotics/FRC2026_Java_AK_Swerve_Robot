@@ -27,6 +27,8 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
@@ -184,12 +186,16 @@ public class DriveCommands {
   /**
    * Field relative drive command using two joysticks with automatic heading maintenance. When the
    * driver is not commanding rotation, the robot holds its current heading using a PID controller.
+   * Supports half-speed mode (50% translation/strafe) and zone angle lock (overrides heading hold
+   * with a field-zone-based target angle when pressed).
    */
   public static Command joystickDriveWithHeadingLock(
       Drive drive,
       DoubleSupplier xSupplier,
       DoubleSupplier ySupplier,
-      DoubleSupplier omegaSupplier) {
+      DoubleSupplier omegaSupplier,
+      BooleanSupplier halfSpeedSupplier,
+      Supplier<Optional<Rotation2d>> zoneLockHeadingSupplier) {
 
     // Create PID controller for heading lock
     ProfiledPIDController angleController =
@@ -210,13 +216,25 @@ public class DriveCommands {
               Translation2d linearVelocity =
                   getLinearVelocityFromJoysticks(xSupplier.getAsDouble(), ySupplier.getAsDouble());
 
+              // Apply half-speed factor (50%) to translation/strafe after squaring
+              double speedFactor = halfSpeedSupplier.getAsBoolean() ? 0.5 : 1.0;
+
               // Apply rotation deadband
               double omega = MathUtil.applyDeadband(omegaSupplier.getAsDouble(), DEADBAND);
 
               // Square rotation value for more precise control
               omega = Math.copySign(omega * omega, omega);
 
-              if (omega != 0.0) {
+              // Check zone angle lock
+              Optional<Rotation2d> zoneLock = zoneLockHeadingSupplier.get();
+
+              if (zoneLock.isPresent()) {
+                // Zone lock active — override heading with zone target
+                omega =
+                    angleController.calculate(
+                        drive.getRotation().getRadians(), zoneLock.get().getRadians());
+                isLocked[0] = false;
+              } else if (omega != 0.0) {
                 // Driver is commanding rotation — use their input directly
                 omega *= drive.getMaxAngularSpeedRadPerSec();
                 isLocked[0] = false;
@@ -236,8 +254,8 @@ public class DriveCommands {
               // Convert to field relative speeds & send command
               ChassisSpeeds speeds =
                   new ChassisSpeeds(
-                      linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
-                      linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
+                      linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec() * speedFactor,
+                      linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec() * speedFactor,
                       omega);
               boolean isFlipped =
                   DriverStation.getAlliance().isPresent()
