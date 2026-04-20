@@ -32,9 +32,9 @@ public class IntakeIOTalonFX implements IntakeIO {
   protected final TalonFX armTalon;
   protected final CANcoder armCancoder;
 
-  private final DutyCycleOut rollerDutyCycle = new DutyCycleOut(0.0);
-  private final DutyCycleOut armDutyCycle = new DutyCycleOut(0.0);
-  private final PositionVoltage armPositionRequest = new PositionVoltage(0.0);
+  private final DutyCycleOut rollerDutyCycle = new DutyCycleOut(0.0).withEnableFOC(true);
+  private final DutyCycleOut armDutyCycle = new DutyCycleOut(0.0).withEnableFOC(true);
+  private final PositionVoltage armPositionRequest = new PositionVoltage(0.0).withEnableFOC(true);
 
   // Roller signals
   private final StatusSignal<Angle> rollerPosition;
@@ -86,7 +86,7 @@ public class IntakeIOTalonFX implements IntakeIO {
     armCancoderAbsPosition = armCancoder.getAbsolutePosition();
 
     BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0,
+        100.0,
         rollerPosition,
         rollerVelocity,
         rollerAppliedVolts,

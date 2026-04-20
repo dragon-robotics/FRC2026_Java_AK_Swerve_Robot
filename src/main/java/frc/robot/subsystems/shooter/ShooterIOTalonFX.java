@@ -13,7 +13,7 @@ import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -35,9 +35,9 @@ public class ShooterIOTalonFX implements ShooterIO {
   private final CANcoder hoodCancoder;
 
   // ── Control requests ────────────────────────────────────────────────────
-  private final VelocityVoltage velocityRequest = new VelocityVoltage(0.0);
-  private final DutyCycleOut kickerDutyRequest = new DutyCycleOut(0.0);
-  private final PositionVoltage hoodPositionRequest = new PositionVoltage(0.0);
+  private final VelocityTorqueCurrentFOC velocityRequest = new VelocityTorqueCurrentFOC(0.0);
+  private final DutyCycleOut kickerDutyRequest = new DutyCycleOut(0.0).withEnableFOC(true);
+  private final PositionVoltage hoodPositionRequest = new PositionVoltage(0.0).withEnableFOC(true);
   private final NeutralOut neutralOut = new NeutralOut();
 
   // ── Lead shooter signals ────────────────────────────────────────────────
@@ -120,7 +120,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     // Set update frequencies
     BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0,
+        100.0,
         leadPosition,
         leadVelocity,
         leadAppliedVolts,
@@ -192,7 +192,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
   @Override
   public void setShooterVelocityRPM(double rpm) {
-    // VelocityVoltage expects rotations per second
+    // VelocityTorqueCurrentFOC expects rotations per second
     shooterLeadTalon.setControl(velocityRequest.withVelocity(rpm / 60.0));
     // Follow motor automatically mirrors via Follower
   }

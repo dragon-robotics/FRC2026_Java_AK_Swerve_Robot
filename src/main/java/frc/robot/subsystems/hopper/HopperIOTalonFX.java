@@ -29,7 +29,7 @@ public class HopperIOTalonFX implements HopperIO {
   private final TalonFX leadTalon;
   private final TalonFX followTalon;
 
-  private final DutyCycleOut dutyCycleRequest = new DutyCycleOut(0.0);
+  private final DutyCycleOut dutyCycleRequest = new DutyCycleOut(0.0).withEnableFOC(true);
 
   // Lead signals
   private final StatusSignal<Angle> leadPosition;
@@ -74,7 +74,7 @@ public class HopperIOTalonFX implements HopperIO {
     followTemp = followTalon.getDeviceTemp();
 
     BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0,
+        100.0,
         leadPosition,
         leadVelocity,
         leadAppliedVolts,
