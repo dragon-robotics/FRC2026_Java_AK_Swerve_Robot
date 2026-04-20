@@ -23,6 +23,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.drive.Drive;
+import frc.robot.util.constants.SwerveConstants;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
@@ -34,10 +35,11 @@ import java.util.function.Supplier;
 
 public class DriveCommands {
   private static final double DEADBAND = 0.1;
-  private static final double ANGLE_KP = 5.0;
+  private static final double ANGLE_KP = 8.0;
   private static final double ANGLE_KD = 0.4;
   private static final double ANGLE_MAX_VELOCITY = 8.0;
   private static final double ANGLE_MAX_ACCELERATION = 20.0;
+  private static final double ANGLE_TOLERANCE = Units.degreesToRadians(2.0);
   private static final double FF_START_DELAY = 2.0; // Secs
   private static final double FF_RAMP_RATE = 0.1; // Volts/Sec
   private static final double WHEEL_RADIUS_MAX_VELOCITY = 0.25; // Rad/Sec
@@ -205,6 +207,7 @@ public class DriveCommands {
             ANGLE_KD,
             new TrapezoidProfile.Constraints(ANGLE_MAX_VELOCITY, ANGLE_MAX_ACCELERATION));
     angleController.enableContinuousInput(-Math.PI, Math.PI);
+    angleController.setTolerance(SwerveConstants.HEADING_TOLERANCE);
 
     // Mutable state for use inside lambda
     Rotation2d[] headingSetpoint = {Rotation2d.kZero};
@@ -239,10 +242,16 @@ public class DriveCommands {
                 omega *= drive.getMaxAngularSpeedRadPerSec();
                 isLocked[0] = false;
               } else if (!isLocked[0]) {
-                // Driver just released rotation stick — capture heading and lock
-                headingSetpoint[0] = drive.getRotation();
-                angleController.reset(drive.getRotation().getRadians());
-                isLocked[0] = true;
+                // Wait for robot to settle before locking heading
+                double angularVelocity = drive.getAngularVelocityRadPerSec();
+                if (Math.abs(angularVelocity) < 0.1) {
+                  // Robot has nearly stopped — lock heading with current velocity for smooth entry
+                  headingSetpoint[0] = drive.getRotation();
+                  angleController.reset(
+                      new TrapezoidProfile.State(
+                          drive.getRotation().getRadians(), angularVelocity));
+                  isLocked[0] = true;
+                }
                 omega = 0.0;
               } else {
                 // Heading is locked — use PID to hold it
