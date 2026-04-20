@@ -1,0 +1,114 @@
+{
+  "version": "2025.0",
+  "waypoints": [
+    {
+      "anchor": {
+        "x": 4.417688172043011,
+        "y": 0.523032258064516
+      },
+      "prevControl": null,
+      "nextControl": {
+        "x": 6.327038333636462,
+        "y": 0.479605442204988
+      },
+      "isLocked": false,
+      "linkedName": null
+    },
+    {
+      "anchor": {
+        "x": 7.099677419354839,
+        "y": 1.132575268817204
+      },
+      "prevControl": {
+        "x": 7.011805398468463,
+        "y": 0.872903787597319
+      },
+      "nextControl": {
+        "x": 7.933548651218675,
+        "y": 3.596756423871378
+      },
+      "isLocked": false,
+      "linkedName": null
+    },
+    {
+      "anchor": {
+        "x": 7.855510752688172,
+        "y": 3.521983870967742
+      },
+      "prevControl": {
+        "x": 7.733869763773071,
+        "y": 3.188816467966995
+      },
+      "nextControl": null,
+      "isLocked": false,
+      "linkedName": null
+    }
+  ],
+  "rotationTargets": [
+    {
+      "waypointRelativePos": 1,
+      "rotationDegrees": 50.55994726330952
+    }
+  ],
+  "constraintZones": [
+    {
+      "name": "Get to the FUEL",
+      "minWaypointRelativePos": 0,
+      "maxWaypointRelativePos": 0.9020090200901822,
+      "constraints": {
+        "maxVelocity": 4.0,
+        "maxAcceleration": 12.0,
+        "maxAngularVelocity": 540.0,
+        "maxAngularAcceleration": 1080.0,
+        "nominalVoltage": 12.0,
+        "unlimited": false
+      }
+    },
+    {
+      "name": "Intake the FUEL",
+      "minWaypointRelativePos": 0.9,
+      "maxWaypointRelativePos": 2.0,
+      "constraints": {
+        "maxVelocity": 1.5,
+        "maxAcceleration": 9.0,
+        "maxAngularVelocity": 540.0,
+        "maxAngularAcceleration": 1080.0,
+        "nominalVoltage": 12.0,
+        "unlimited": false
+      }
+    }
+  ],
+  "pointTowardsZones": [],
+  "eventMarkers": [
+    {
+      "name": "Intake",
+      "waypointRelativePos": 0.3017630176301729,
+      "endWaypointRelativePos": null,
+      "command": {
+        "type": "named",
+        "data": {
+          "name": "Intake"
+        }
+      }
+    }
+  ],
+  "globalConstraints": {
+    "maxVelocity": 3.6,
+    "maxAcceleration": 4.0,
+    "maxAngularVelocity": 540.0,
+    "maxAngularAcceleration": 1080.0,
+    "nominalVoltage": 12.0,
+    "unlimited": false
+  },
+  "goalEndState": {
+    "velocity": 0,
+    "rotation": 89.1185960034179
+  },
+  "reversed": false,
+  "folder": null,
+  "idealStartingState": {
+    "velocity": 0,
+    "rotation": 90.0
+  },
+  "useDefaultConstraints": true
+}
