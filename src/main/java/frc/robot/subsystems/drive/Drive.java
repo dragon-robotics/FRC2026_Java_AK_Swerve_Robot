@@ -308,6 +308,11 @@ public class Drive extends SubsystemBase {
     return kinematics.toChassisSpeeds(getModuleStates());
   }
 
+  /** Returns the current angular velocity of the robot in radians per second. */
+  public double getAngularVelocityRadPerSec() {
+    return getChassisSpeeds().omegaRadiansPerSecond;
+  }
+
   /** Returns the position of each module in radians. */
   public double[] getWheelRadiusCharacterizationPositions() {
     double[] values = new double[4];
