@@ -20,8 +20,12 @@ public class HopperIOSim implements HopperIO {
 
   public HopperIOSim() {
     DCMotor motor = DCMotor.getKrakenX60(1);
-    leadSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(motor, 0.005, 1.0), motor, 0.0);
-    followSim = new DCMotorSim(LinearSystemId.createDCMotorSystem(motor, 0.005, 1.0), motor, 0.0);
+    leadSim =
+        new DCMotorSim(
+            LinearSystemId.createDCMotorSystem(motor, 0.005, 1.0), motor, new double[] {0.0, 0.0});
+    followSim =
+        new DCMotorSim(
+            LinearSystemId.createDCMotorSystem(motor, 0.005, 1.0), motor, new double[] {0.0, 0.0});
   }
 
   @Override

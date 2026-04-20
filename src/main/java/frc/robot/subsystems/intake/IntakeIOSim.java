@@ -45,7 +45,9 @@ public class IntakeIOSim implements IntakeIO {
     DCMotor rollerMotor = DCMotor.getKrakenX60(1);
     rollerSim =
         new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(rollerMotor, 0.0025, 1.0), rollerMotor, 0.0);
+            LinearSystemId.createDCMotorSystem(rollerMotor, 0.0025, 1.0),
+            rollerMotor,
+            new double[] {0.0, 0.0});
 
     armSim =
         new SingleJointedArmSim(

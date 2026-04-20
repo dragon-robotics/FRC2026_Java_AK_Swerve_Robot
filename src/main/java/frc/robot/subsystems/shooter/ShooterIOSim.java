@@ -34,12 +34,16 @@ public class ShooterIOSim implements ShooterIO {
     DCMotor flywheelMotor = DCMotor.getKrakenX60(2);
     shooterSim =
         new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(flywheelMotor, 0.005, 1.0), flywheelMotor, 0.0);
+            LinearSystemId.createDCMotorSystem(flywheelMotor, 0.005, 1.0),
+            flywheelMotor,
+            new double[] {0.0, 0.0});
 
     DCMotor kickerMotor = DCMotor.getKrakenX60(1);
     kickerSim =
         new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(kickerMotor, 0.002, 1.0), kickerMotor, 0.0);
+            LinearSystemId.createDCMotorSystem(kickerMotor, 0.002, 1.0),
+            kickerMotor,
+            new double[] {0.0, 0.0});
 
     hoodSim =
         new SingleJointedArmSim(
