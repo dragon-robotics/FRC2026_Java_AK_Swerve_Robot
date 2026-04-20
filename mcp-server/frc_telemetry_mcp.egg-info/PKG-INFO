@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: frc-telemetry-mcp
+Version: 0.1.0
+Summary: MCP server exposing FRC robot sim telemetry (NetworkTables/AdvantageKit) to VS Code Copilot
+Requires-Python: >=3.10
+Requires-Dist: mcp[cli]>=1.0.0
+Requires-Dist: pyntcore>=2026.0.0

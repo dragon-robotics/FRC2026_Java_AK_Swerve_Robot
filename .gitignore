@@ -185,3 +185,11 @@ compile_commands.json
 
 # Version file
 src/main/java/frc/robot/BuildConstants.java
+
+# MCP server Python venv
+mcp-server/.venv/
+
+# SysId data
+.SysId/
+sysid*.wpilog
+sysid*.csv

@@ -1,0 +1,8 @@
+pyproject.toml
+server.py
+frc_telemetry_mcp.egg-info/PKG-INFO
+frc_telemetry_mcp.egg-info/SOURCES.txt
+frc_telemetry_mcp.egg-info/dependency_links.txt
+frc_telemetry_mcp.egg-info/entry_points.txt
+frc_telemetry_mcp.egg-info/requires.txt
+frc_telemetry_mcp.egg-info/top_level.txt

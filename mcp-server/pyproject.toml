@@ -1,0 +1,12 @@
+[project]
+name = "frc-telemetry-mcp"
+version = "0.1.0"
+description = "MCP server exposing FRC robot sim telemetry (NetworkTables/AdvantageKit) to VS Code Copilot"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "pyntcore>=2026.0.0",
+]
+
+[project.scripts]
+frc-telemetry-mcp = "server:main"
