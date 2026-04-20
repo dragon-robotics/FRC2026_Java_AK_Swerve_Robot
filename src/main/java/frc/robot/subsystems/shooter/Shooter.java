@@ -110,6 +110,11 @@ public class Shooter extends SubsystemBase {
     return MathUtil.isNear(targetRPM, inputs.shooterLeadVelocityRPM, 100.0);
   }
 
+  /** Direct kicker override — bypasses the state machine for operator emergency control. */
+  public void setKickerPercentDirect(double percent) {
+    io.setKickerPercent(percent);
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // State management
   // ──────────────────────────────────────────────────────────────────────────

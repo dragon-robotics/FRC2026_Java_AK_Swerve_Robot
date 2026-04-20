@@ -367,6 +367,11 @@ public class Superstructure extends SubsystemBase {
     return HubShiftUtil.getShiftedShiftInfo().remainingTime();
   }
 
+  /** Returns the cached hub target position (alliance-aware). */
+  public Translation2d getCachedHubTarget() {
+    return cachedHubTarget;
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // Periodic — telemetry and vision reseed ONLY, no subsystem state writes
   // ──────────────────────────────────────────────────────────────────────────

@@ -151,6 +151,37 @@ public class DriveCommands {
   }
 
   /**
+   * Field relative drive command that continuously aims the robot at a target hub position while
+   * the driver controls translation. Computes the angle from the robot to the hub each cycle and
+   * uses PID to track that heading. Applies a PI rotation for Red alliance so the correct side of
+   * the robot faces the hub.
+   */
+  public static Command joystickDriveAimAtHub(
+      Drive drive,
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      Supplier<Translation2d> hubTargetSupplier) {
+    return joystickDriveAtAngle(
+        drive,
+        xSupplier,
+        ySupplier,
+        () -> {
+          Translation2d hub = hubTargetSupplier.get();
+          Translation2d robot = drive.getPose().getTranslation();
+          Translation2d delta = hub.minus(robot);
+          double rawAngle = Math.atan2(delta.getY(), delta.getX());
+
+          boolean isRed =
+              DriverStation.getAlliance().isPresent()
+                  && DriverStation.getAlliance().get() == Alliance.Red;
+
+          return isRed
+              ? new Rotation2d(rawAngle).rotateBy(Rotation2d.kPi)
+              : new Rotation2d(rawAngle);
+        });
+  }
+
+  /**
    * Field relative drive command using two joysticks with automatic heading maintenance. When the
    * driver is not commanding rotation, the robot holds its current heading using a PID controller.
    */

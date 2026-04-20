@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Superstructure;
+import frc.robot.subsystems.Superstructure.SuperState;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIOPigeon2;
@@ -32,6 +33,7 @@ import frc.robot.subsystems.hopper.HopperIO;
 import frc.robot.subsystems.hopper.HopperIOSim;
 import frc.robot.subsystems.hopper.HopperIOTalonFX;
 import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.Intake.IntakeState;
 import frc.robot.subsystems.intake.IntakeIO;
 import frc.robot.subsystems.intake.IntakeIOSim;
 import frc.robot.subsystems.intake.IntakeIOTalonFX;
@@ -61,8 +63,9 @@ public class RobotContainer {
   private final Shooter shooter;
   private final Superstructure superstructure;
 
-  // Controller
+  // Controllers
   private final CommandXboxController controller = new CommandXboxController(0);
+  private final CommandXboxController operatorController = new CommandXboxController(1);
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -179,7 +182,7 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    // Default command, field-relative drive with heading lock
+    // ── Default command: field-relative drive with heading lock ────────
     drive.setDefaultCommand(
         DriveCommands.joystickDriveWithHeadingLock(
             drive,
@@ -187,22 +190,14 @@ public class RobotContainer {
             () -> -controller.getLeftX(),
             () -> -controller.getRightX()));
 
-    // Lock to 0° when A button is held
-    controller
-        .a()
-        .whileTrue(
-            DriveCommands.joystickDriveAtAngle(
-                drive,
-                () -> -controller.getLeftY(),
-                () -> -controller.getLeftX(),
-                () -> Rotation2d.kZero));
+    // ────────────────────────────────────────────────────────────────────
+    // Driver Controls
+    // ────────────────────────────────────────────────────────────────────
 
-    // Switch to X pattern when X button is pressed
-    controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
-
-    // Reset gyro to 0° when B button is pressed
+    // Reset field-centric heading on Start + Back
     controller
-        .b()
+        .start()
+        .and(controller.back())
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -210,6 +205,64 @@ public class RobotContainer {
                             new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero)),
                     drive)
                 .ignoringDisable(true));
+
+    // Intake: LT held → INTAKE, released → DRIVE
+    controller
+        .leftTrigger(0.2)
+        .onTrue(superstructure.setStateCmd(SuperState.INTAKE))
+        .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
+
+    // Outtake: RB held → OUTTAKE, released → DRIVE
+    controller
+        .rightBumper()
+        .onTrue(superstructure.setStateCmd(SuperState.OUTTAKE))
+        .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
+
+    // Shoot: RT held → SHOOT state + aim at hub, released → DRIVE
+    controller
+        .rightTrigger(0.2)
+        .whileTrue(
+            superstructure
+                .setStateCmd(SuperState.SHOOT)
+                .alongWith(
+                    DriveCommands.joystickDriveAimAtHub(
+                        drive,
+                        () -> -controller.getLeftY(),
+                        () -> -controller.getLeftX(),
+                        superstructure::getCachedHubTarget)))
+        .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
+
+    // Juicer: B held → JUICER override, released → DEPLOYED
+    controller
+        .b()
+        .whileTrue(superstructure.intakeOverrideCmd(IntakeState.JUICER))
+        .onFalse(superstructure.intakeOverrideCmd(IntakeState.DEPLOYED));
+
+    // Drive starting config: X held
+    controller.x().whileTrue(superstructure.setStateCmd(SuperState.DRIVE_STARTING_CONFIG));
+
+    // ────────────────────────────────────────────────────────────────────
+    // Operator Controls
+    // ────────────────────────────────────────────────────────────────────
+
+    // Juicer: operator B held → JUICER override, released → DEPLOYED
+    operatorController
+        .b()
+        .whileTrue(superstructure.intakeOverrideCmd(IntakeState.JUICER))
+        .onFalse(superstructure.intakeOverrideCmd(IntakeState.DEPLOYED));
+
+    // Toggle manual shooter distance override: operator X + A
+    operatorController
+        .x()
+        .and(operatorController.a())
+        .onTrue(superstructure.toggleManualShooterDistanceOverrideCmd());
+
+    // Kicker full power override: operator RB held
+    operatorController
+        .rightBumper()
+        .whileTrue(
+            Commands.run(() -> shooter.setKickerPercentDirect(1.0), shooter)
+                .withName("Kicker Full Power"));
   }
 
   /**
