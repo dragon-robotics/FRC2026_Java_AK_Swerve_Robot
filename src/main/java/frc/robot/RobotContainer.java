@@ -10,6 +10,7 @@ package frc.robot;
 import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
@@ -64,7 +65,7 @@ public class RobotContainer {
   private final Superstructure superstructure;
 
   // Controllers
-  private final CommandXboxController controller = new CommandXboxController(0);
+  private final CommandXboxController driverController = new CommandXboxController(0);
   private final CommandXboxController operatorController = new CommandXboxController(1);
 
   // Dashboard inputs
@@ -152,6 +153,17 @@ public class RobotContainer {
     // Create superstructure coordinator (after all subsystems are initialized)
     superstructure = new Superstructure(drive, intake, hopper, shooter);
 
+    // Register PathPlanner named commands (must be done BEFORE AutoBuilder.buildAutoChooser)
+    NamedCommands.registerCommand("Intake", superstructure.setStateCmd(SuperState.INTAKE));
+    NamedCommands.registerCommand(
+        "Shoot",
+        superstructure
+            .setStateCmd(SuperState.SHOOT)
+            .alongWith(
+                Commands.waitSeconds(1.5)
+                    .andThen(superstructure.intakeOverrideCmd(IntakeState.JUICER))));
+    NamedCommands.registerCommand("Drive", superstructure.setStateCmd(SuperState.DRIVE));
+
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
 
@@ -183,21 +195,27 @@ public class RobotContainer {
    */
   private void configureButtonBindings() {
     // ── Default command: field-relative drive with heading lock ────────
+    // D-Pad Up = half speed (50%), X button = zone angle lock
     drive.setDefaultCommand(
         DriveCommands.joystickDriveWithHeadingLock(
             drive,
-            () -> -controller.getLeftY(),
-            () -> -controller.getLeftX(),
-            () -> -controller.getRightX()));
+            () -> -driverController.getLeftY(),
+            () -> -driverController.getLeftX(),
+            () -> -driverController.getRightX(),
+            () -> driverController.getHID().getPOV() == 0,
+            () ->
+                driverController.getHID().getXButton()
+                    ? superstructure.getZoneLockedHeading()
+                    : java.util.Optional.empty()));
 
     // ────────────────────────────────────────────────────────────────────
     // Driver Controls
     // ────────────────────────────────────────────────────────────────────
 
     // Reset field-centric heading on Start + Back
-    controller
+    driverController
         .start()
-        .and(controller.back())
+        .and(driverController.back())
         .onTrue(
             Commands.runOnce(
                     () ->
@@ -207,19 +225,19 @@ public class RobotContainer {
                 .ignoringDisable(true));
 
     // Intake: LT held → INTAKE, released → DRIVE
-    controller
+    driverController
         .leftTrigger(0.2)
         .onTrue(superstructure.setStateCmd(SuperState.INTAKE))
         .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
 
     // Outtake: RB held → OUTTAKE, released → DRIVE
-    controller
+    driverController
         .rightBumper()
         .onTrue(superstructure.setStateCmd(SuperState.OUTTAKE))
         .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
 
     // Shoot: RT held → SHOOT state + aim at hub, released → DRIVE
-    controller
+    driverController
         .rightTrigger(0.2)
         .whileTrue(
             superstructure
@@ -227,19 +245,19 @@ public class RobotContainer {
                 .alongWith(
                     DriveCommands.joystickDriveAimAtHub(
                         drive,
-                        () -> -controller.getLeftY(),
-                        () -> -controller.getLeftX(),
+                        () -> -driverController.getLeftY(),
+                        () -> -driverController.getLeftX(),
                         superstructure::getCachedHubTarget)))
         .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
 
     // Juicer: B held → JUICER override, released → DEPLOYED
-    controller
+    driverController
         .b()
         .whileTrue(superstructure.intakeOverrideCmd(IntakeState.JUICER))
         .onFalse(superstructure.intakeOverrideCmd(IntakeState.DEPLOYED));
 
-    // Drive starting config: X held
-    controller.x().whileTrue(superstructure.setStateCmd(SuperState.DRIVE_STARTING_CONFIG));
+    // Drive starting config: A held
+    driverController.a().whileTrue(superstructure.setStateCmd(SuperState.DRIVE_STARTING_CONFIG));
 
     // ────────────────────────────────────────────────────────────────────
     // Operator Controls
