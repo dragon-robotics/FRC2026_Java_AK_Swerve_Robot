@@ -7,7 +7,7 @@
 
 package frc.robot.subsystems.drive;
 
-import java.util.Queue;
+import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
@@ -31,7 +31,6 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
-
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
@@ -40,7 +39,7 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Voltage;
 import frc.robot.generated.TunerConstants;
-import static frc.robot.util.PhoenixUtil.tryUntilOk;
+import java.util.Queue;
 
 /**
  * Module IO implementation for Talon FX drive motor controller, Talon FX turn motor controller, and
@@ -63,7 +62,8 @@ public class ModuleIOTalonFX implements ModuleIO {
   private final PositionVoltage positionVoltageRequest = new PositionVoltage(0.0);
   private final VelocityVoltage velocityVoltageRequest = new VelocityVoltage(0.0);
   private final MotionMagicVoltage motionMagicPositionVoltageRequest = new MotionMagicVoltage(0.0);
-  private final MotionMagicExpoVoltage motionMagicExpoPositionVoltageRequest = new MotionMagicExpoVoltage(0.0);
+  private final MotionMagicExpoVoltage motionMagicExpoPositionVoltageRequest =
+      new MotionMagicExpoVoltage(0.0);
 
   // Torque-current control requests
   private final TorqueCurrentFOC torqueCurrentRequest = new TorqueCurrentFOC(0);
@@ -136,8 +136,9 @@ public class ModuleIOTalonFX implements ModuleIO {
           case RemoteCANcoder -> FeedbackSensorSourceValue.RemoteCANcoder;
           case FusedCANcoder -> FeedbackSensorSourceValue.FusedCANcoder;
           case SyncCANcoder -> FeedbackSensorSourceValue.SyncCANcoder;
-          default -> throw new RuntimeException(
-              "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFX. Please check the AdvantageKit documentation for more information on alternative configurations: https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
+          default ->
+              throw new RuntimeException(
+                  "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFX. Please check the AdvantageKit documentation for more information on alternative configurations: https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
         };
     turnConfig.Feedback.RotorToSensorRatio = constants.SteerMotorGearRatio;
     turnConfig.MotionMagic.MotionMagicCruiseVelocity = 100.0 / constants.SteerMotorGearRatio;
@@ -268,8 +269,8 @@ public class ModuleIOTalonFX implements ModuleIO {
     turnTalon.setControl(
         switch (constants.SteerMotorClosedLoopOutput) {
           case Voltage -> positionVoltageRequest.withPosition(rotation.getRotations());
-          case TorqueCurrentFOC -> positionTorqueCurrentRequest.withPosition(
-              rotation.getRotations());
+          case TorqueCurrentFOC ->
+              positionTorqueCurrentRequest.withPosition(rotation.getRotations());
         });
   }
 
@@ -277,10 +278,9 @@ public class ModuleIOTalonFX implements ModuleIO {
   public void setTurnPositionMotionMagic(Rotation2d rotation) {
     turnTalon.setControl(
         switch (constants.SteerMotorClosedLoopOutput) {
-          case Voltage -> motionMagicPositionVoltageRequest.withPosition(
-              rotation.getRotations());
-          case TorqueCurrentFOC -> motionMagicPositionTorqueCurrentRequest.withPosition(
-              rotation.getRotations());
+          case Voltage -> motionMagicPositionVoltageRequest.withPosition(rotation.getRotations());
+          case TorqueCurrentFOC ->
+              motionMagicPositionTorqueCurrentRequest.withPosition(rotation.getRotations());
         });
   }
 
@@ -288,10 +288,10 @@ public class ModuleIOTalonFX implements ModuleIO {
   public void setTurnPositionMotionMagicExpo(Rotation2d rotation) {
     turnTalon.setControl(
         switch (constants.SteerMotorClosedLoopOutput) {
-          case Voltage -> motionMagicExpoPositionVoltageRequest.withPosition(
-              rotation.getRotations());
-          case TorqueCurrentFOC -> motionMagicExpoPositionTorqueCurrentRequest.withPosition(
-              rotation.getRotations());
+          case Voltage ->
+              motionMagicExpoPositionVoltageRequest.withPosition(rotation.getRotations());
+          case TorqueCurrentFOC ->
+              motionMagicExpoPositionTorqueCurrentRequest.withPosition(rotation.getRotations());
         });
   }
 }
