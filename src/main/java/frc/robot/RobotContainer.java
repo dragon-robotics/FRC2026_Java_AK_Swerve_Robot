@@ -7,10 +7,11 @@
 
 package frc.robot;
 
-import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
@@ -44,11 +45,11 @@ import frc.robot.subsystems.shooter.ShooterIOSim;
 import frc.robot.subsystems.shooter.ShooterIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
+import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.constants.OperatorConstants;
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -250,7 +251,7 @@ public class RobotContainer {
             superstructure
                 .setStateCmd(SuperState.SHOOT)
                 .alongWith(
-                    DriveCommands.joystickDriveAimAtHub(
+                    DriveCommands.joystickDriveAimAtTarget(
                         drive,
                         () -> -driverController.getLeftY(),
                         () -> -driverController.getLeftX(),

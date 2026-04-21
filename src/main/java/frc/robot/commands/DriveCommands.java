@@ -7,6 +7,15 @@
 
 package frc.robot.commands;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
@@ -24,14 +33,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.util.constants.SwerveConstants;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 public class DriveCommands {
   private static final double DEADBAND = 0.1;
@@ -155,33 +156,26 @@ public class DriveCommands {
   }
 
   /**
-   * Field relative drive command that continuously aims the robot at a target hub position while
-   * the driver controls translation. Computes the angle from the robot to the hub each cycle and
-   * uses PID to track that heading. Applies a PI rotation for Red alliance so the correct side of
-   * the robot faces the hub.
+   * Field relative drive command that continuously aims the robot at an arbitrary target position
+   * while the driver controls translation. Computes the angle from the robot to the target each
+   * cycle and uses PID to track that heading. The caller is responsible for supplying an
+   * alliance-aware target position.
    */
-  public static Command joystickDriveAimAtHub(
+  public static Command joystickDriveAimAtTarget(
       Drive drive,
       DoubleSupplier xSupplier,
       DoubleSupplier ySupplier,
-      Supplier<Translation2d> hubTargetSupplier) {
+      Supplier<Translation2d> targetSupplier) {
     return joystickDriveAtAngle(
         drive,
         xSupplier,
         ySupplier,
         () -> {
-          Translation2d hub = hubTargetSupplier.get();
+          Translation2d target = targetSupplier.get();
           Translation2d robot = drive.getPose().getTranslation();
-          Translation2d delta = hub.minus(robot);
+          Translation2d delta = target.minus(robot);
           double rawAngle = Math.atan2(delta.getY(), delta.getX());
-
-          boolean isRed =
-              DriverStation.getAlliance().isPresent()
-                  && DriverStation.getAlliance().get() == Alliance.Red;
-
-          return isRed
-              ? new Rotation2d(rawAngle).rotateBy(Rotation2d.kPi)
-              : new Rotation2d(rawAngle);
+          return new Rotation2d(rawAngle);
         });
   }
 
