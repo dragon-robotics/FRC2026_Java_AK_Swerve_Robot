@@ -7,15 +7,17 @@
 
 package frc.robot;
 
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
-
+import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -45,11 +47,11 @@ import frc.robot.subsystems.shooter.ShooterIOSim;
 import frc.robot.subsystems.shooter.ShooterIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
-import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.constants.OperatorConstants;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -58,6 +60,8 @@ import frc.robot.util.constants.OperatorConstants;
  * subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
+  private static final String OTF_RECOVERY_ENABLED_KEY = "Auto/Recovery/Enabled";
+
   // Subsystems
   private final Drive drive;
   private final Vision vision;
@@ -171,6 +175,18 @@ public class RobotContainer {
                 Commands.waitSeconds(1.5)
                     .andThen(superstructure.intakeOverrideCmd(IntakeState.JUICER))));
     NamedCommands.registerCommand("Drive", superstructure.setStateCmd(SuperState.DRIVE));
+    SmartDashboard.putBoolean(OTF_RECOVERY_ENABLED_KEY, true);
+    NamedCommands.registerCommand(
+        "OTF Recovery Follow Path",
+        DriveCommands.followPathWithOnTheFlyRecovery(
+            drive,
+            "OTF Recovery Test",
+            new PathConstraints(
+                3.0, 4.0, Units.degreesToRadians(540), Units.degreesToRadians(1080)),
+            0.75,
+            0.5,
+            () -> SmartDashboard.getBoolean(OTF_RECOVERY_ENABLED_KEY, true),
+            1));
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser());
