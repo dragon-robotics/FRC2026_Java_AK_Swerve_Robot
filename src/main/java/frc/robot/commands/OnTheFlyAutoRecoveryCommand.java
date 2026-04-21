@@ -7,18 +7,21 @@
 
 package frc.robot.commands;
 
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+
+import org.littletonrobotics.junction.Logger;
+
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import frc.robot.subsystems.drive.Drive;
-import java.util.List;
-import java.util.function.BooleanSupplier;
-import java.util.function.Supplier;
-import org.littletonrobotics.junction.Logger;
 
 /**
  * Wraps a path-following command with one-shot on-the-fly recovery. If the robot drifts farther
@@ -42,6 +45,15 @@ public class OnTheFlyAutoRecoveryCommand extends Command {
   private int recoveryAttemptCount = 0;
   private double lastRecoveryTriggerTimestampSeconds = Double.NEGATIVE_INFINITY;
 
+  /**
+   * Creates a recovery command with recovery enabled and a single recovery attempt allowed.
+   *
+   * @param drive the drive subsystem, used as the command requirement
+   * @param path the PathPlanner path to follow
+   * @param recoveryConstraints kinematic constraints used during pathfind-then-follow recovery
+   * @param maxDeviationMeters distance threshold in meters beyond which recovery is triggered
+   * @param recoveryCooldownSeconds minimum seconds between successive recovery attempts
+   */
   public OnTheFlyAutoRecoveryCommand(
       Drive drive,
       PathPlannerPath path,
@@ -58,6 +70,19 @@ public class OnTheFlyAutoRecoveryCommand extends Command {
         1);
   }
 
+  /**
+   * Creates a recovery command with full control over enable/disable and attempt count.
+   *
+   * @param drive the drive subsystem, used as the command requirement
+   * @param path the PathPlanner path to follow
+   * @param recoveryConstraints kinematic constraints used during pathfind-then-follow recovery
+   * @param maxDeviationMeters distance threshold in meters beyond which recovery is triggered
+   * @param recoveryCooldownSeconds minimum seconds between successive recovery attempts
+   * @param recoveryEnabledSupplier runtime gate; recovery is skipped when this returns {@code
+   *     false} (e.g. bound to a SmartDashboard toggle)
+   * @param maxRecoveryAttempts maximum number of recovery attempts per run; {@code 0} or negative
+   *     means unlimited
+   */
   public OnTheFlyAutoRecoveryCommand(
       Drive drive,
       PathPlannerPath path,
@@ -82,6 +107,25 @@ public class OnTheFlyAutoRecoveryCommand extends Command {
         false);
   }
 
+  /**
+   * Full-injection constructor for testing. All external dependencies are provided as suppliers so
+   * the command can be exercised without a real Drive subsystem, PathPlanner runtime, or HAL.
+   *
+   * @param requirement the subsystem this command requires (typically the drive subsystem)
+   * @param poseSupplier supplier of the robot's current field-relative pose
+   * @param expectedPathPosesSupplier supplier of the list of poses that define the expected path
+   * @param initialFollowCommandSupplier factory for the primary path-following command
+   * @param recoveryCommandSupplier factory for the recovery command (called each time recovery
+   *     triggers so a fresh command instance is created per attempt)
+   * @param recoveryEnabledSupplier runtime gate; recovery is skipped when this returns {@code
+   *     false}
+   * @param maxDeviationMeters distance threshold in meters beyond which recovery is triggered
+   * @param recoveryCooldownSeconds minimum seconds between successive recovery attempts
+   * @param maxRecoveryAttempts maximum number of recovery attempts per run; {@code 0} or negative
+   *     means unlimited
+   * @param resumeFollowAfterRecovery if {@code true}, restarts the initial follow command after
+   *     each recovery completes; if {@code false}, the outer command ends when recovery finishes
+   */
   OnTheFlyAutoRecoveryCommand(
       Subsystem requirement,
       Supplier<Pose2d> poseSupplier,
