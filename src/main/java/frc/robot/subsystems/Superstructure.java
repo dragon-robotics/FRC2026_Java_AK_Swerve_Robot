@@ -8,6 +8,10 @@
 
 package frc.robot.subsystems;
 
+import java.util.Optional;
+
+import org.littletonrobotics.junction.Logger;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -27,8 +31,6 @@ import frc.robot.util.HubShiftUtil;
 import frc.robot.util.HubShiftUtil.ShiftInfo;
 import frc.robot.util.constants.FieldConstants;
 import frc.robot.util.constants.FieldConstants.FieldZones;
-import java.util.Optional;
-import org.littletonrobotics.junction.Logger;
 
 /**
  * The Superstructure coordinates the Intake, Hopper, and Shooter subsystems into unified
@@ -336,11 +338,19 @@ public class Superstructure extends SubsystemBase {
       return Optional.empty();
     }
 
+    boolean isRed = alliance == DriverStation.Alliance.Red;
+
     switch (currentZone) {
       case ALLIANCE_LEFT, NEUTRAL_LEFT, OPPONENT_LEFT:
-        return Optional.of(Rotation2d.fromDegrees(-45));
+        return Optional.of(
+            isRed
+                ? Rotation2d.fromDegrees(-45).rotateBy(Rotation2d.kPi)
+                : Rotation2d.fromDegrees(-45));
       case ALLIANCE_RIGHT, NEUTRAL_RIGHT, OPPONENT_RIGHT:
-        return Optional.of(Rotation2d.fromDegrees(45.0));
+        return Optional.of(
+            isRed
+                ? Rotation2d.fromDegrees(45.0).rotateBy(Rotation2d.kPi)
+                : Rotation2d.fromDegrees(45.0));
       default:
         return Optional.empty();
     }
