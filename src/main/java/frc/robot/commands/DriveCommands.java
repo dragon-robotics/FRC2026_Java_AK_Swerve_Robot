@@ -7,15 +7,8 @@
 
 package frc.robot.commands;
 
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
-
+import com.pathplanner.lib.path.PathConstraints;
+import com.pathplanner.lib.path.PathPlannerPath;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.filter.SlewRateLimiter;
@@ -33,6 +26,14 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.util.constants.SwerveConstants;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 public class DriveCommands {
   private static final double DEADBAND = 0.1;
@@ -282,6 +283,56 @@ public class DriveCommands {
             },
             drive)
         .beforeStarting(() -> isLocked[0] = false);
+  }
+
+  /**
+   * Follows a PathPlanner path with automatic on-the-fly recovery. If the robot deviates too far
+   * from the expected path poses, the command switches to a pathfind-then-follow recovery command
+   * for the same path.
+   */
+  public static Command followPathWithOnTheFlyRecovery(
+      Drive drive,
+      String pathName,
+      PathConstraints recoveryConstraints,
+      double maxDeviationMeters,
+      double recoveryCooldownSeconds) {
+    return followPathWithOnTheFlyRecovery(
+        drive,
+        pathName,
+        recoveryConstraints,
+        maxDeviationMeters,
+        recoveryCooldownSeconds,
+        () -> true,
+        1);
+  }
+
+  /**
+   * Follows a PathPlanner path with automatic on-the-fly recovery. The recovery behavior can be
+   * enabled/disabled at runtime and capped to a maximum number of attempts.
+   */
+  public static Command followPathWithOnTheFlyRecovery(
+      Drive drive,
+      String pathName,
+      PathConstraints recoveryConstraints,
+      double maxDeviationMeters,
+      double recoveryCooldownSeconds,
+      BooleanSupplier recoveryEnabledSupplier,
+      int maxRecoveryAttempts) {
+    PathPlannerPath path;
+    try {
+      path = PathPlannerPath.fromPathFile(pathName);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to load path file for on-the-fly recovery: " + pathName, e);
+    }
+    return new OnTheFlyAutoRecoveryCommand(
+        drive,
+        path,
+        recoveryConstraints,
+        maxDeviationMeters,
+        recoveryCooldownSeconds,
+        recoveryEnabledSupplier,
+        maxRecoveryAttempts);
   }
 
   /**

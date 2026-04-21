@@ -8,10 +8,6 @@
 
 package frc.robot.subsystems;
 
-import java.util.Optional;
-
-import org.littletonrobotics.junction.Logger;
-
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -31,6 +27,8 @@ import frc.robot.util.HubShiftUtil;
 import frc.robot.util.HubShiftUtil.ShiftInfo;
 import frc.robot.util.constants.FieldConstants;
 import frc.robot.util.constants.FieldConstants.FieldZones;
+import java.util.Optional;
+import org.littletonrobotics.junction.Logger;
 
 /**
  * The Superstructure coordinates the Intake, Hopper, and Shooter subsystems into unified
