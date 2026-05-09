@@ -9,6 +9,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
+import frc.robot.sim.MapleSimGameSimulation;
 
 /** Physics-sim implementation of {@link HopperIO}. */
 public class HopperIOSim implements HopperIO {
@@ -16,9 +17,16 @@ public class HopperIOSim implements HopperIO {
 
   private final DCMotorSim leadSim;
   private final DCMotorSim followSim;
+  private final MapleSimGameSimulation gameSimulation;
   private double appliedVolts = 0.0;
 
   public HopperIOSim() {
+    this(null);
+  }
+
+  public HopperIOSim(MapleSimGameSimulation gameSimulation) {
+    this.gameSimulation = gameSimulation;
+
     DCMotor motor = DCMotor.getKrakenX60(1);
     leadSim =
         new DCMotorSim(
@@ -54,5 +62,8 @@ public class HopperIOSim implements HopperIO {
   @Override
   public void setRollerPercent(double percent) {
     appliedVolts = MathUtil.clamp(percent, -1.0, 1.0) * 12.0;
+    if (gameSimulation != null) {
+      gameSimulation.setHopperFeedingShooter(percent > 0.05);
+    }
   }
 }

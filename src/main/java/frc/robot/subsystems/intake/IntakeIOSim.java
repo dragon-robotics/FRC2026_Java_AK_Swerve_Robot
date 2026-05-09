@@ -18,6 +18,7 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
+import frc.robot.sim.MapleSimGameSimulation;
 
 /**
  * Physics-sim implementation of {@link IntakeIO}. Roller is a simple flywheel-ish DC motor model;
@@ -29,6 +30,7 @@ public class IntakeIOSim implements IntakeIO {
 
   private final DCMotorSim rollerSim;
   private final SingleJointedArmSim armSim;
+  private final MapleSimGameSimulation gameSimulation;
 
   // Roller: open-loop voltage from percent command
   private double rollerAppliedVolts = 0.0;
@@ -42,6 +44,12 @@ public class IntakeIOSim implements IntakeIO {
   private double armAppliedVolts = 0.0;
 
   public IntakeIOSim() {
+    this(null);
+  }
+
+  public IntakeIOSim(MapleSimGameSimulation gameSimulation) {
+    this.gameSimulation = gameSimulation;
+
     DCMotor rollerMotor = DCMotor.getKrakenX60(1);
     rollerSim =
         new DCMotorSim(
@@ -103,6 +111,9 @@ public class IntakeIOSim implements IntakeIO {
   @Override
   public void setRollerPercent(double percent) {
     rollerAppliedVolts = MathUtil.clamp(percent, -1.0, 1.0) * 12.0;
+    if (gameSimulation != null) {
+      gameSimulation.setIntakeRunning(percent > 0.05);
+    }
   }
 
   @Override

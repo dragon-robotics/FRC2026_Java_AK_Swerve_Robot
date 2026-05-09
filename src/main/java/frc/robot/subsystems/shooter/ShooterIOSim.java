@@ -9,8 +9,10 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import edu.wpi.first.wpilibj.simulation.SingleJointedArmSim;
+import frc.robot.sim.MapleSimGameSimulation;
 
 /** Physics-sim implementation of {@link ShooterIO}. */
 public class ShooterIOSim implements ShooterIO {
@@ -19,6 +21,7 @@ public class ShooterIOSim implements ShooterIO {
   // Flywheel sims (lead + follow share the same setpoint in sim)
   private final DCMotorSim shooterSim;
   private final DCMotorSim kickerSim;
+  private final MapleSimGameSimulation gameSimulation;
 
   // Hood sim — modeled as single-jointed arm
   private final SingleJointedArmSim hoodSim;
@@ -29,8 +32,16 @@ public class ShooterIOSim implements ShooterIO {
   private double hoodAppliedVolts = 0.0;
   private boolean hoodClosedLoop = false;
   private double hoodSetpointRot = 0.0;
+  private double shooterSetpointRPM = 0.0;
+  private double lastLaunchAttemptTimestamp = -999.0;
 
   public ShooterIOSim() {
+    this(null);
+  }
+
+  public ShooterIOSim(MapleSimGameSimulation gameSimulation) {
+    this.gameSimulation = gameSimulation;
+
     DCMotor flywheelMotor = DCMotor.getKrakenX60(2);
     shooterSim =
         new DCMotorSim(
@@ -76,6 +87,15 @@ public class ShooterIOSim implements ShooterIO {
     hoodSim.setInput(hoodAppliedVolts);
     hoodSim.update(LOOP_PERIOD_SECS);
 
+    if (gameSimulation != null
+        && gameSimulation.isHopperFeedingShooter()
+        && kickerAppliedVolts > 1.0
+        && Timer.getFPGATimestamp() - lastLaunchAttemptTimestamp > 0.1) {
+      if (gameSimulation.tryLaunchUserFuel(shooterSetpointRPM, hoodSetpointRot)) {
+        lastLaunchAttemptTimestamp = Timer.getFPGATimestamp();
+      }
+    }
+
     // Lead flywheel
     inputs.shooterLeadConnected = true;
     inputs.shooterLeadPositionRotations = shooterSim.getAngularPositionRotations();
@@ -114,11 +134,13 @@ public class ShooterIOSim implements ShooterIO {
   public void setShooterVelocityRPM(double rpm) {
     // Simple voltage-proportional approximation for sim
     double maxRPM = 6000.0;
+    shooterSetpointRPM = rpm;
     shooterAppliedVolts = MathUtil.clamp((rpm / maxRPM) * 12.0, -12.0, 12.0);
   }
 
   @Override
   public void stopShooter() {
+    shooterSetpointRPM = 0.0;
     shooterAppliedVolts = 0.0;
   }
 
