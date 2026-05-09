@@ -49,6 +49,7 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.util.LocalADStarAK;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.ironmaple.simulation.drivesims.SelfControlledSwerveDriveSimulation;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
@@ -84,6 +85,7 @@ public class Drive extends SubsystemBase {
 
   static final Lock odometryLock = new ReentrantLock();
   private final GyroIO gyroIO;
+  private final SelfControlledSwerveDriveSimulation mapleSimDrive;
   private final GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
   private final Module[] modules = new Module[4]; // FL, FR, BL, BR
   private final SysIdRoutine sysId;
@@ -111,7 +113,18 @@ public class Drive extends SubsystemBase {
       ModuleIO frModuleIO,
       ModuleIO blModuleIO,
       ModuleIO brModuleIO) {
+    this(gyroIO, flModuleIO, frModuleIO, blModuleIO, brModuleIO, null);
+  }
+
+  public Drive(
+      GyroIO gyroIO,
+      ModuleIO flModuleIO,
+      ModuleIO frModuleIO,
+      ModuleIO blModuleIO,
+      ModuleIO brModuleIO,
+      SelfControlledSwerveDriveSimulation mapleSimDrive) {
     this.gyroIO = gyroIO;
+    this.mapleSimDrive = mapleSimDrive;
     modules[0] = new Module(flModuleIO, 0, TunerConstants.FrontLeft);
     modules[1] = new Module(frModuleIO, 1, TunerConstants.FrontRight);
     modules[2] = new Module(blModuleIO, 2, TunerConstants.BackLeft);
@@ -217,6 +230,12 @@ public class Drive extends SubsystemBase {
 
     // Update gyro alert
     gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
+
+    if (mapleSimDrive != null) {
+      mapleSimDrive.periodic();
+      Logger.recordOutput(
+          "FieldSimulation/UserRobotEstimatedPose", mapleSimDrive.getOdometryEstimatedPose());
+    }
   }
 
   /**
@@ -240,6 +259,10 @@ public class Drive extends SubsystemBase {
     // Send setpoints to modules
     for (int i = 0; i < 4; i++) {
       modules[i].runSetpoint(setpointStates[i]);
+    }
+
+    if (mapleSimDrive != null) {
+      mapleSimDrive.runChassisSpeeds(speeds, Translation2d.kZero, false, false);
     }
 
     // Log optimized setpoints (runSetpoint mutates each state)
@@ -305,6 +328,9 @@ public class Drive extends SubsystemBase {
   /** Returns the measured chassis speeds of the robot. */
   @AutoLogOutput(key = "SwerveChassisSpeeds/Measured")
   private ChassisSpeeds getChassisSpeeds() {
+    if (mapleSimDrive != null) {
+      return mapleSimDrive.getMeasuredSpeedsRobotRelative(true);
+    }
     return kinematics.toChassisSpeeds(getModuleStates());
   }
 
@@ -334,6 +360,9 @@ public class Drive extends SubsystemBase {
   /** Returns the current odometry pose. */
   @AutoLogOutput(key = "Odometry/Robot")
   public Pose2d getPose() {
+    if (mapleSimDrive != null) {
+      return mapleSimDrive.getOdometryEstimatedPose();
+    }
     return poseEstimator.getEstimatedPosition();
   }
 
@@ -345,6 +374,10 @@ public class Drive extends SubsystemBase {
   /** Resets the current odometry pose. */
   public void setPose(Pose2d pose) {
     poseEstimator.resetPosition(rawGyroRotation, getModulePositions(), pose);
+    if (mapleSimDrive != null) {
+      mapleSimDrive.setSimulationWorldPose(pose);
+      mapleSimDrive.resetOdometry(pose);
+    }
   }
 
   /** Adds a new timestamped vision measurement. */
@@ -354,6 +387,10 @@ public class Drive extends SubsystemBase {
       Matrix<N3, N1> visionMeasurementStdDevs) {
     poseEstimator.addVisionMeasurement(
         visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
+    if (mapleSimDrive != null) {
+      mapleSimDrive.addVisionEstimation(
+          visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
+    }
   }
 
   /** Returns the maximum linear speed in meters per sec. */
