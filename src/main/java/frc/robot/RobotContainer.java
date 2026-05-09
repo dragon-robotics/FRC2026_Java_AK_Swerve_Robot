@@ -7,11 +7,10 @@
 
 package frc.robot;
 
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
-
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
@@ -22,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
+import frc.robot.sim.MapleSimGameSimulation;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.SuperState;
 import frc.robot.subsystems.drive.Drive;
@@ -45,11 +45,12 @@ import frc.robot.subsystems.shooter.ShooterIOSim;
 import frc.robot.subsystems.shooter.ShooterIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
-import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.constants.OperatorConstants;
+import org.ironmaple.simulation.drivesims.SelfControlledSwerveDriveSimulation;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -65,6 +66,7 @@ public class RobotContainer {
   private final Hopper hopper;
   private final Shooter shooter;
   private final Superstructure superstructure;
+  private final MapleSimGameSimulation gameSimulation;
 
   // Controllers
   private final CommandXboxController driverController =
@@ -79,6 +81,7 @@ public class RobotContainer {
   public RobotContainer() {
     switch (Constants.currentMode) {
       case REAL:
+        gameSimulation = null;
         // Real robot, instantiate hardware IO implementations
         // ModuleIOTalonFX is intended for modules with TalonFX drive, TalonFX turn, and
         // a CANcoder
@@ -107,6 +110,8 @@ public class RobotContainer {
         break;
 
       case SIM:
+        SelfControlledSwerveDriveSimulation mapleSimDrive =
+            MapleSimGameSimulation.createUserDriveSimulation();
         // Sim robot, instantiate physics sim IO implementations
         drive =
             new Drive(
@@ -114,7 +119,9 @@ public class RobotContainer {
                 new ModuleIOSim(TunerConstants.FrontLeft),
                 new ModuleIOSim(TunerConstants.FrontRight),
                 new ModuleIOSim(TunerConstants.BackLeft),
-                new ModuleIOSim(TunerConstants.BackRight));
+                new ModuleIOSim(TunerConstants.BackRight),
+                mapleSimDrive);
+        gameSimulation = new MapleSimGameSimulation(mapleSimDrive);
         vision =
             new Vision(
                 drive::addVisionMeasurement,
@@ -135,12 +142,13 @@ public class RobotContainer {
                     APTAG_CAMERA_NAMES[3],
                     VisionConstants.APTAG_POSE_EST_CAM_L_POS,
                     drive::getPose));
-        intake = new Intake(new IntakeIOSim());
-        hopper = new Hopper(new HopperIOSim());
-        shooter = new Shooter(new ShooterIOSim());
+        intake = new Intake(new IntakeIOSim(gameSimulation));
+        hopper = new Hopper(new HopperIOSim(gameSimulation));
+        shooter = new Shooter(new ShooterIOSim(gameSimulation));
         break;
 
       default:
+        gameSimulation = null;
         // Replayed robot, disable IO implementations
         drive =
             new Drive(
@@ -193,6 +201,18 @@ public class RobotContainer {
 
     // Configure the button bindings
     configureButtonBindings();
+  }
+
+  public void simulationInit() {
+    if (gameSimulation != null) {
+      gameSimulation.simulationInit();
+    }
+  }
+
+  public void simulationPeriodic() {
+    if (gameSimulation != null) {
+      gameSimulation.simulationPeriodic();
+    }
   }
 
   /**
