@@ -366,6 +366,20 @@ public class Drive extends SubsystemBase {
     return poseEstimator.getEstimatedPosition();
   }
 
+  /**
+   * Returns the true physics pose from the maple-sim engine (sim mode only). Use this — not
+   * getPose() — as the pose supplier for VisionIOPhotonVisionSim so the camera sim generates tag
+   * observations from the actual robot position rather than the drifted odometry estimate. Using
+   * getPose() here creates a circular echo chamber where vision "confirms" the existing estimate
+   * instead of correcting it.
+   */
+  public Pose2d getActualSimPose() {
+    if (mapleSimDrive != null) {
+      return mapleSimDrive.getActualPoseInSimulationWorld();
+    }
+    return getPose();
+  }
+
   /** Returns the current odometry rotation. */
   public Rotation2d getRotation() {
     return getPose().getRotation();

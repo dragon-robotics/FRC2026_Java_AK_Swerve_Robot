@@ -129,19 +129,19 @@ public class RobotContainer {
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[0],
                     VisionConstants.APTAG_POSE_EST_CAM_F_POS,
-                    drive::getPose),
+                    drive::getActualSimPose),
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[1],
                     VisionConstants.APTAG_POSE_EST_CAM_R_POS,
-                    drive::getPose),
+                    drive::getActualSimPose),
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[2],
                     VisionConstants.APTAG_POSE_EST_CAM_B_POS,
-                    drive::getPose),
+                    drive::getActualSimPose),
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[3],
                     VisionConstants.APTAG_POSE_EST_CAM_L_POS,
-                    drive::getPose));
+                    drive::getActualSimPose));
         intake = new Intake(new IntakeIOSim(gameSimulation));
         hopper = new Hopper(new HopperIOSim(gameSimulation));
         shooter = new Shooter(new ShooterIOSim(gameSimulation));
