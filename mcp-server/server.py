@@ -23,6 +23,7 @@ from typing import Any
 
 import ntcore
 from mcp.server.fastmcp import FastMCP
+from log_reader import load_log, evict_log, resample_signal, pose2d_drift_stats
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -631,6 +632,283 @@ def get_drive_diagnostics() -> str:
         {"diagnostic": "Drive", "values": results},
         indent=2,
     )
+
+
+# ---------------------------------------------------------------------------
+# Log Analysis Tools (offline .wpilog parsing)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def log_load(path: str) -> str:
+    """
+    Parse and cache a .wpilog file for offline analysis.
+
+    Call this first before using other log_* tools.
+    On success returns a summary: number of channels, time range, and file info.
+
+    Args:
+        path: Absolute or relative path to the .wpilog file.
+              Example: "C:/FRC_Software/.../sysid.wpilog"
+    """
+    try:
+        log = load_log(path)
+    except FileNotFoundError:
+        return json.dumps({"error": f"File not found: {path}"})
+    except ValueError as e:
+        return json.dumps({"error": str(e)})
+    except Exception as e:
+        return json.dumps({"error": f"Parse error: {e}"})
+
+    return json.dumps(
+        {
+            "path": path,
+            "channel_count": len(log.channels),
+            "duration_s": round(log.duration_s, 3),
+            "extra_header": log.extra_header,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def log_list_topics(path: str, prefix: str = "") -> str:
+    """
+    List all logged channels (topics) in a .wpilog file.
+
+    Args:
+        path: Path to the .wpilog file (must have been loaded with log_load first).
+        prefix: Optional filter — only topics whose name contains this string.
+                Examples: "Drive", "Vision", "Odometry", "FieldSimulation"
+
+    Returns a list of channels with name, type, sample count, and time range.
+    """
+    try:
+        log = load_log(path)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    results = []
+    for name, ch in sorted(log.channels.items()):
+        if prefix and prefix.lower() not in name.lower():
+            continue
+        first_t = ch.samples[0][0] if ch.samples else None
+        last_t = ch.samples[-1][0] if ch.samples else None
+        results.append(
+            {
+                "name": name,
+                "type": ch.type_str,
+                "sample_count": len(ch.samples),
+                "start_s": round(first_t, 3) if first_t is not None else None,
+                "end_s": round(last_t, 3) if last_t is not None else None,
+            }
+        )
+
+    return json.dumps(
+        {"path": path, "channel_count": len(results), "channels": results},
+        indent=2,
+    )
+
+
+@mcp.tool()
+def log_query_signal(
+    path: str,
+    channel: str,
+    start_s: float | None = None,
+    end_s: float | None = None,
+    max_samples: int = 200,
+) -> str:
+    """
+    Extract a signal's value history from a .wpilog file.
+
+    Args:
+        path: Path to the .wpilog file.
+        channel: Full channel name (e.g., "/AdvantageKit/RealOutputs/Odometry/Robot").
+                 Use log_list_topics() to discover available channel names.
+        start_s: Start of time window in seconds (default: beginning of log).
+        end_s:   End of time window in seconds (default: end of log).
+        max_samples: Maximum number of samples to return (default 200). Use a larger
+                     value for high-precision analysis, smaller for quick overviews.
+
+    Returns timestamped samples as a list of {time_s, value} objects.
+    """
+    try:
+        log = load_log(path)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    ch = log.channels.get(channel)
+    if ch is None:
+        # Try suffix match
+        matches = [n for n in log.channels if n.endswith("/" + channel) or n.endswith(channel)]
+        if len(matches) == 1:
+            ch = log.channels[matches[0]]
+        elif len(matches) > 1:
+            return json.dumps({"error": f"Ambiguous channel '{channel}'. Matches: {matches}"})
+        else:
+            return json.dumps({"error": f"Channel '{channel}' not found. Use log_list_topics() to search."})
+
+    samples = resample_signal(ch.samples, start_s, end_s, max_samples)
+    return json.dumps(
+        {
+            "channel": ch.name,
+            "type": ch.type_str,
+            "sample_count": len(samples),
+            "samples": [{"time_s": round(t, 5), "value": v} for t, v in samples],
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def log_compare_poses(
+    path: str,
+    actual_channel: str,
+    estimated_channel: str,
+    start_s: float | None = None,
+    end_s: float | None = None,
+) -> str:
+    """
+    Compare two Pose2d/Pose3d channels and compute drift statistics.
+
+    Typical use: compare "FieldSimulation/UserRobotActualPose" vs
+    "FieldSimulation/UserRobotEstimatedPose" to measure how much the odometry
+    estimate has drifted from the physics ground truth.
+
+    Args:
+        path:              Path to the .wpilog file.
+        actual_channel:    Full name of the ground-truth pose channel.
+        estimated_channel: Full name of the estimated pose channel.
+        start_s:           Start of analysis window (default: whole log).
+        end_s:             End of analysis window (default: whole log).
+
+    Returns mean, max, and 95th-percentile translational and heading errors.
+    """
+    try:
+        log = load_log(path)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    def _get_channel(name: str):
+        ch = log.channels.get(name)
+        if ch is None:
+            matches = [n for n in log.channels if n.endswith("/" + name) or n.endswith(name)]
+            if len(matches) == 1:
+                return log.channels[matches[0]]
+            if len(matches) > 1:
+                raise ValueError(f"Ambiguous channel '{name}'. Matches: {matches}")
+            raise ValueError(f"Channel '{name}' not found. Use log_list_topics() to search.")
+        return ch
+
+    try:
+        actual_ch = _get_channel(actual_channel)
+        estimated_ch = _get_channel(estimated_channel)
+    except ValueError as e:
+        return json.dumps({"error": str(e)})
+
+    MAX = 10_000
+    actual_s = resample_signal(actual_ch.samples, start_s, end_s, MAX)
+    estimated_s = resample_signal(estimated_ch.samples, start_s, end_s, MAX)
+
+    stats = pose2d_drift_stats(actual_s, estimated_s)
+
+    return json.dumps(
+        {
+            "actual_channel": actual_ch.name,
+            "estimated_channel": estimated_ch.name,
+            "time_range_s": {
+                "start": round(actual_s[0][0], 3) if actual_s else None,
+                "end": round(actual_s[-1][0], 3) if actual_s else None,
+            },
+            "drift_stats": stats,
+        },
+        indent=2,
+    )
+
+
+@mcp.tool()
+def log_summarize_subsystem(
+    path: str,
+    subsystem: str,
+    start_s: float | None = None,
+    end_s: float | None = None,
+) -> str:
+    """
+    Summarize all logged channels for a given subsystem from a .wpilog file.
+
+    For each channel matching the subsystem prefix, returns the first, last,
+    min, and max value (where applicable) and sample count over the time window.
+    Useful for quickly understanding subsystem behavior without reading every signal.
+
+    Args:
+        path:      Path to the .wpilog file.
+        subsystem: Subsystem name prefix, e.g. "Drive", "Vision", "Shooter".
+                   Matches any channel whose name contains this string.
+        start_s:   Start of time window (default: beginning of log).
+        end_s:     End of time window (default: end of log).
+    """
+    try:
+        log = load_log(path)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    summaries = {}
+    for name, ch in sorted(log.channels.items()):
+        if subsystem.lower() not in name.lower():
+            continue
+
+        samples = [
+            s for s in ch.samples
+            if (start_s is None or s[0] >= start_s) and (end_s is None or s[0] <= end_s)
+        ]
+        if not samples:
+            summaries[name] = {"sample_count": 0}
+            continue
+
+        first_val = samples[0][1]
+        last_val = samples[-1][1]
+        summary: dict = {
+            "sample_count": len(samples),
+            "start_s": round(samples[0][0], 3),
+            "end_s": round(samples[-1][0], 3),
+            "first": first_val,
+            "last": last_val,
+        }
+
+        # Compute numeric stats when possible
+        if ch.type_str in ("double", "float", "int64"):
+            vals = [s[1] for s in samples if isinstance(s[1], (int, float))]
+            if vals:
+                summary["min"] = round(min(vals), 5)
+                summary["max"] = round(max(vals), 5)
+                summary["mean"] = round(sum(vals) / len(vals), 5)
+
+        summaries[name] = summary
+
+    if not summaries:
+        return json.dumps(
+            {"error": f"No channels found matching subsystem '{subsystem}'. "
+                      "Use log_list_topics() to explore available channels."}
+        )
+
+    return json.dumps(
+        {"path": path, "subsystem": subsystem, "channel_count": len(summaries), "channels": summaries},
+        indent=2,
+    )
+
+
+@mcp.tool()
+def log_evict_cache(path: str) -> str:
+    """
+    Remove a previously loaded .wpilog from the in-memory cache.
+
+    Useful after you've replaced the log file on disk and want to reload it fresh.
+
+    Args:
+        path: Path to the .wpilog file to evict.
+    """
+    evict_log(path)
+    return json.dumps({"evicted": path})
 
 
 # ---------------------------------------------------------------------------
