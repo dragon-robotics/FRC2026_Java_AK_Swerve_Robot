@@ -107,7 +107,10 @@ public class MapleSimGameSimulation {
   public MapleSimGameSimulation(SelfControlledSwerveDriveSimulation userDriveSimulation) {
     this.userDriveSimulation = userDriveSimulation;
 
-    arena = new Arena2026Rebuilt(true);
+    // Pass false so the ramp area is NOT treated as a solid wall collider.
+    // maple-sim cannot simulate ramp physics (15° up/down), so AddRampCollider=true
+    // blocks the robot entirely; false allows traversal while keeping the hub blocked.
+    arena = new Arena2026Rebuilt(false);
     arena.setEfficiencyMode(true);
     SimulatedArena.overrideInstance(arena);
     arena.addDriveTrainSimulation(userDriveSimulation.getDriveTrainSimulation());
