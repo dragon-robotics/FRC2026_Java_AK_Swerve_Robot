@@ -8,17 +8,21 @@ import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ARM_CANCODER_CO
 import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ARM_CANCODER_ID;
 import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ARM_MOTOR_ID;
 import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ARM_TALONFX_CONFIG;
-import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_MOTOR_ID;
-import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_TALONFX_CONFIG;
+import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_FOLLOW_MOTOR_ID;
+import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_FOLLOW_TALONFX_CONFIG;
+import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_LEAD_MOTOR_ID;
+import static frc.robot.subsystems.intake.IntakeConstants.INTAKE_ROLLER_LEAD_TALONFX_CONFIG;
 import static frc.robot.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.controls.DutyCycleOut;
+import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
@@ -29,6 +33,7 @@ import edu.wpi.first.units.measure.Voltage;
 /** Real TalonFX-based implementation of {@link IntakeIO}. */
 public class IntakeIOTalonFX implements IntakeIO {
   protected final TalonFX rollerTalon;
+  protected final TalonFX rollerFollowTalon;
   protected final TalonFX armTalon;
   protected final CANcoder armCancoder;
 
@@ -61,14 +66,23 @@ public class IntakeIOTalonFX implements IntakeIO {
       new Debouncer(0.5, Debouncer.DebounceType.kFalling);
 
   public IntakeIOTalonFX() {
-    rollerTalon = new TalonFX(INTAKE_ROLLER_MOTOR_ID);
+    rollerTalon = new TalonFX(INTAKE_ROLLER_LEAD_MOTOR_ID);
+    rollerFollowTalon = new TalonFX(INTAKE_ROLLER_FOLLOW_MOTOR_ID);
     armTalon = new TalonFX(INTAKE_ARM_MOTOR_ID);
     armCancoder = new CANcoder(INTAKE_ARM_CANCODER_ID);
 
     // Apply configs
     tryUntilOk(5, () -> armCancoder.getConfigurator().apply(INTAKE_ARM_CANCODER_CONFIG, 0.25));
-    tryUntilOk(5, () -> rollerTalon.getConfigurator().apply(INTAKE_ROLLER_TALONFX_CONFIG, 0.25));
+    tryUntilOk(
+        5, () -> rollerTalon.getConfigurator().apply(INTAKE_ROLLER_LEAD_TALONFX_CONFIG, 0.25));
+    tryUntilOk(
+        5,
+        () -> rollerFollowTalon.getConfigurator().apply(INTAKE_ROLLER_FOLLOW_TALONFX_CONFIG, 0.25));
     tryUntilOk(5, () -> armTalon.getConfigurator().apply(INTAKE_ARM_TALONFX_CONFIG, 0.25));
+
+    // Follower mirrors the lead roller in the same direction.
+    rollerFollowTalon.setControl(
+        new Follower(INTAKE_ROLLER_LEAD_MOTOR_ID, MotorAlignmentValue.Aligned));
 
     rollerPosition = rollerTalon.getPosition();
     rollerVelocity = rollerTalon.getVelocity();
@@ -100,7 +114,8 @@ public class IntakeIOTalonFX implements IntakeIO {
         armCancoderAbsPosition);
     BaseStatusSignal.setUpdateFrequencyForAll(1.0, rollerTemp, armTemp);
 
-    ParentDevice.optimizeBusUtilizationForAll(rollerTalon, armTalon, armCancoder);
+    ParentDevice.optimizeBusUtilizationForAll(
+        rollerTalon, rollerFollowTalon, armTalon, armCancoder);
   }
 
   @Override

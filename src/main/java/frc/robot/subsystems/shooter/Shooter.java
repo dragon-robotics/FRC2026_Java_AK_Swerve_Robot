@@ -91,6 +91,19 @@ public class Shooter extends SubsystemBase {
     this.manualDistanceOverride = override;
   }
 
+  public void setSetpoint(double shooterRpm, double hoodAngle) {
+    targetRPM = shooterRpm;
+    this.hoodAngle = hoodAngle;
+  }
+
+  public double getTargetRPM() {
+    return targetRPM;
+  }
+
+  public double getTargetHoodAngle() {
+    return hoodAngle;
+  }
+
   /**
    * Called by Superstructure periodic to update the distance-based setpoints. If manual override is
    * active, defaults are used instead.

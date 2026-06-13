@@ -88,6 +88,17 @@
   "pointTowardsZones": [],
   "eventMarkers": [
     {
+      "name": "Drive",
+      "waypointRelativePos": 0,
+      "endWaypointRelativePos": null,
+      "command": {
+        "type": "named",
+        "data": {
+          "name": "Drive"
+        }
+      }
+    },
+    {
       "name": "Intake",
       "waypointRelativePos": 1.4219030520646345,
       "endWaypointRelativePos": null,
