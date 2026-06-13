@@ -14,7 +14,6 @@ import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
-import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
@@ -32,7 +31,6 @@ public class ShooterIOTalonFX implements ShooterIO {
   private final TalonFX shooterFollowTalon;
   private final TalonFX kickerTalon;
   private final TalonFX hoodTalon;
-  private final CANcoder hoodCancoder;
 
   // ── Control requests ────────────────────────────────────────────────────
   private final VelocityTorqueCurrentFOC velocityRequest = new VelocityTorqueCurrentFOC(0.0);
@@ -65,7 +63,6 @@ public class ShooterIOTalonFX implements ShooterIO {
   private final StatusSignal<Voltage> hoodAppliedVolts;
   private final StatusSignal<Current> hoodStatorCurrent;
   private final StatusSignal<Temperature> hoodTemp;
-  private final StatusSignal<Angle> hoodEncoderPosition;
 
   // ── Debouncers ──────────────────────────────────────────────────────────
   private final Debouncer leadConnDebounce = new Debouncer(0.5, Debouncer.DebounceType.kFalling);
@@ -80,7 +77,6 @@ public class ShooterIOTalonFX implements ShooterIO {
     shooterFollowTalon = new TalonFX(SHOOTER_FOLLOW_MOTOR_ID);
     kickerTalon = new TalonFX(SHOOTER_KICKER_MOTOR_ID);
     hoodTalon = new TalonFX(SHOOTER_HOOD_MOTOR_ID);
-    hoodCancoder = new CANcoder(SHOOTER_CANCODER_ID);
 
     // Apply configs
     tryUntilOk(
@@ -89,7 +85,6 @@ public class ShooterIOTalonFX implements ShooterIO {
         5, () -> shooterFollowTalon.getConfigurator().apply(SHOOTER_FOLLOW_TALONFX_CONFIG, 0.25));
     tryUntilOk(5, () -> kickerTalon.getConfigurator().apply(SHOOTER_KICKER_TALONFX_CONFIG, 0.25));
     tryUntilOk(5, () -> hoodTalon.getConfigurator().apply(SHOOTER_HOOD_TALONFX_CONFIG, 0.25));
-    tryUntilOk(5, () -> hoodCancoder.getConfigurator().apply(SHOOTER_HOOD_CANCODER_CONFIG, 0.25));
 
     // Follow motor mirrors lead
     shooterFollowTalon.setControl(new Follower(SHOOTER_LEAD_MOTOR_ID, MotorAlignmentValue.Aligned));
@@ -116,7 +111,6 @@ public class ShooterIOTalonFX implements ShooterIO {
     hoodAppliedVolts = hoodTalon.getMotorVoltage();
     hoodStatorCurrent = hoodTalon.getStatorCurrent();
     hoodTemp = hoodTalon.getDeviceTemp();
-    hoodEncoderPosition = hoodCancoder.getAbsolutePosition();
 
     // Set update frequencies
     BaseStatusSignal.setUpdateFrequencyForAll(
@@ -134,12 +128,11 @@ public class ShooterIOTalonFX implements ShooterIO {
         hoodPosition,
         hoodVelocity,
         hoodAppliedVolts,
-        hoodStatorCurrent,
-        hoodEncoderPosition);
+        hoodStatorCurrent);
     BaseStatusSignal.setUpdateFrequencyForAll(1.0, leadTemp, followTemp, kickerTemp, hoodTemp);
 
     ParentDevice.optimizeBusUtilizationForAll(
-        shooterLeadTalon, shooterFollowTalon, kickerTalon, hoodTalon, hoodCancoder);
+        shooterLeadTalon, shooterFollowTalon, kickerTalon, hoodTalon);
   }
 
   @Override
@@ -156,7 +149,6 @@ public class ShooterIOTalonFX implements ShooterIO {
     var hoodStatus =
         BaseStatusSignal.refreshAll(
             hoodPosition, hoodVelocity, hoodAppliedVolts, hoodStatorCurrent, hoodTemp);
-    var hoodEncoderStatus = BaseStatusSignal.refreshAll(hoodEncoderPosition);
 
     // Lead
     inputs.shooterLeadConnected = leadConnDebounce.calculate(leadStatus.isOK());
@@ -182,7 +174,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     // Hood
     inputs.hoodConnected = hoodConnDebounce.calculate(hoodStatus.isOK());
-    inputs.hoodEncoderConnected = hoodEncoderConnDebounce.calculate(hoodEncoderStatus.isOK());
+    inputs.hoodEncoderConnected = hoodEncoderConnDebounce.calculate(hoodStatus.isOK());
     inputs.hoodPositionRotations = hoodPosition.getValueAsDouble();
     inputs.hoodVelocityRotPerSec = hoodVelocity.getValueAsDouble();
     inputs.hoodAppliedVolts = hoodAppliedVolts.getValueAsDouble();

@@ -142,6 +142,37 @@ public final class VisionConstants {
   // cause vision to be permanently rejected — vision is needed to CORRECT drift.
   public static double MAX_POSE_DISCREPANCY_METERS = 2.0;
 
+  // Reject observations farther than this average distance from observed tags.
+  public static final double MAX_AVG_TAG_DISTANCE_METERS = 5.5;
+
+  // Runtime innovation gate against odometry at the same timestamp.
+  public static final double MAX_POSE_DELTA_METERS = 2.5;
+
+  // Tighten trust while the robot is actively aiming.
+  public static final double AIM_LINEAR_STDDEV_MULTIPLIER = 0.6;
+
+  // Single-tag and coplanar observations need additional distrust.
+  public static final double SINGLE_TAG_LINEAR_STDDEV_MULTIPLIER = 5.0;
+
+  // Vision heading is ignored; gyro remains authoritative.
+  public static final double HEADING_STDDEV_IGNORE = 1e9;
+
+  // Optional constrained/trig solve fallback support in PhotonVision IO.
+  public static final boolean ENABLE_CONSTRAINED_FALLBACK = true;
+  public static final double CONSTRAINED_MAX_ANGULAR_RATE_RAD_PER_SEC = 0.5;
+  public static final double TRIG_MAX_ANGULAR_RATE_RAD_PER_SEC = 1.0;
+  public static final double CONSTRAINED_HEADING_SCALE_FACTOR = 0.2;
+
+  // Apply single-tag distrust to coplanar multitag sets when enabled.
+  public static final boolean APPLY_COPLANAR_PENALTY =
+      Boolean.parseBoolean(System.getProperty("vision.applyCoplanarPenalty", "false"));
+
+  // Ordered PhotonPoseEstimator strategy chain.
+  public static final String PHOTON_POSE_STRATEGY_ORDER =
+      System.getProperty(
+          "vision.photon.strategyOrder",
+          "CONSTRAINED_SOLVEPNP,MULTI_TAG_PNP_ON_COPROCESSOR,PNP_DISTANCE_TRIG_SOLVE,LOWEST_AMBIGUITY");
+
   // Cross-camera consistency checks.
   // If other cameras have recently accepted poses and a camera's observation
   // disagrees with their consensus by more than this, the observation is rejected.

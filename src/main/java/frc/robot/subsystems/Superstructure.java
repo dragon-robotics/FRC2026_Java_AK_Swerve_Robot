@@ -1,16 +1,8 @@
 // Copyright (c) FIRST and other WPILib contributors.
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
-//
-// Coordinates Intake, Hopper, and Shooter state machines into coherent
-// "super-states". Ported from dragon-robotics/FRC2026_Java_Swerve_Robot
-// (feature/shift-timers), adapted to AdvantageKit IO pattern.
 
 package frc.robot.subsystems;
-
-import java.util.Optional;
-
-import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -19,6 +11,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.hopper.Hopper;
@@ -27,61 +20,54 @@ import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.intake.Intake.IntakeState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.shooter.Shooter.ShooterState;
+import frc.robot.subsystems.vision.Vision;
 import frc.robot.util.HubShiftUtil;
 import frc.robot.util.HubShiftUtil.ShiftInfo;
 import frc.robot.util.constants.FieldConstants;
 import frc.robot.util.constants.FieldConstants.FieldZones;
+import java.util.Optional;
+import org.littletonrobotics.junction.Logger;
 
-/**
- * The Superstructure coordinates the Intake, Hopper, and Shooter subsystems into unified
- * "super-states" (DRIVE, INTAKE, OUTTAKE, SHOOT). Each super-state sets the desired states of all
- * three subsystems simultaneously via WPILib command requirements.
- *
- * <p>When a command ends (e.g. button released), the scheduler automatically resumes the default
- * commands on each subsystem — no god loop needed.
- */
+/** Coordinates intake, hopper, shooter and aiming behavior into unified robot-level states. */
 public class Superstructure extends SubsystemBase {
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // State Enum
-  // ──────────────────────────────────────────────────────────────────────────
-
   public enum SuperState {
     DRIVE_STARTING_CONFIG,
     DRIVE,
     INTAKE,
     OUTTAKE,
-    SHOOT
+    SHOOT,
+    SHOOT_WITH_AIM,
+    SHOOT_NO_AIM,
+    MANUAL_SHOOT,
+    PURGE
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Subsystem References
-  // ──────────────────────────────────────────────────────────────────────────
+  public enum ShootMode {
+    DEFAULT_SHOOT_WITH_AIM,
+    MANUAL_BUMPER_UP,
+    MANUAL_TRENCH
+  }
 
   private final Drive drive;
   private final Intake intake;
   private final Hopper hopper;
   private final Shooter shooter;
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Heading Tracking
-  // ──────────────────────────────────────────────────────────────────────────
+  private final Vision vision;
 
   private Optional<Rotation2d> currentHeading = Optional.empty();
   private double rotationLastTriggered = 0.0;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Alignment & Targeting
-  // ──────────────────────────────────────────────────────────────────────────
-
-  private static final double ALIGNMENT_TOLERANCE_DEGREES = 3.0;
+  private static final double ALIGNMENT_TOLERANCE_DEGREES = 5.0;
   private boolean alignedToTarget = false;
-  private Translation2d cachedHubTarget;
   private boolean allianceConfirmed = false;
   private FieldZones currentZone;
-  private boolean manualShooterDistanceOverride = false;
 
-  // Pre-cached zone name strings — avoids .name() heap allocation every cycle
+  private static final double MANUAL_BUMPER_UP_RPM = 2500.0;
+  private static final double MANUAL_BUMPER_UP_HOOD = 0.0;
+  private static final double MANUAL_TRENCH_RPM = 2900.0;
+  private static final double MANUAL_TRENCH_HOOD = 0.75;
+  private static final double NEUTRAL_ZONE_HOOD_LOCK = 2.0;
+
   private static final String[] ZONE_NAMES;
 
   static {
@@ -92,38 +78,22 @@ public class Superstructure extends SubsystemBase {
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // State Machine
-  // ──────────────────────────────────────────────────────────────────────────
-
   private SuperState state;
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Alliance
-  // ──────────────────────────────────────────────────────────────────────────
+  private ShootMode shootMode = ShootMode.DEFAULT_SHOOT_WITH_AIM;
   private DriverStation.Alliance alliance;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Constructor
-  // ──────────────────────────────────────────────────────────────────────────
-
-  public Superstructure(Drive drive, Intake intake, Hopper hopper, Shooter shooter) {
+  public Superstructure(Drive drive, Intake intake, Hopper hopper, Shooter shooter, Vision vision) {
     this.drive = drive;
     this.intake = intake;
     this.hopper = hopper;
     this.shooter = shooter;
+    this.vision = vision;
 
     state = SuperState.DRIVE_STARTING_CONFIG;
-
-    // Default to blue until DriverStation alliance becomes available
     alliance = DriverStation.Alliance.Blue;
-    cachedHubTarget = FieldConstants.Hub.BLUE_CENTER_POSE;
     currentZone = null;
-    refreshAllianceAndCachedHubTarget();
+    refreshAlliance();
 
-    // ── Default Commands ─────────────────────────────────────────────────
-    // These run whenever no other command requires the subsystem.
-    // They define the "DRIVE" superstate behavior.
     intake.setDefaultCommand(
         intake
             .runOnce(() -> intake.setDesiredState(IntakeState.DEPLOYED))
@@ -140,25 +110,179 @@ public class Superstructure extends SubsystemBase {
 
   private void setAlliance(DriverStation.Alliance newAlliance) {
     alliance = newAlliance;
-    cachedHubTarget =
-        alliance == DriverStation.Alliance.Red
-            ? FieldConstants.Hub.RED_CENTER_POSE
-            : FieldConstants.Hub.BLUE_CENTER_POSE;
   }
 
-  private void refreshAllianceAndCachedHubTarget() {
+  static Translation2d resolveAimTargetForZone(
+      boolean allianceConfirmed, FieldZones zone, DriverStation.Alliance alliance) {
+    if (!allianceConfirmed || zone == null) {
+      return alliance == DriverStation.Alliance.Red
+          ? FieldConstants.Hub.RED_CENTER_POSE
+          : FieldConstants.Hub.BLUE_CENTER_POSE;
+    }
+
+    boolean isRed = alliance == DriverStation.Alliance.Red;
+    return switch (zone) {
+      case NEUTRAL_LEFT_SHOOT ->
+          isRed
+              ? FieldConstants.AimPoints.RED_LEFT_SHOOT_POINT
+              : FieldConstants.AimPoints.BLUE_LEFT_SHOOT_POINT;
+      case NEUTRAL_RIGHT_SHOOT ->
+          isRed
+              ? FieldConstants.AimPoints.RED_RIGHT_SHOOT_POINT
+              : FieldConstants.AimPoints.BLUE_RIGHT_SHOOT_POINT;
+      case NEUTRAL_LEFT_PURGE ->
+          isRed
+              ? FieldConstants.AimPoints.RED_LEFT_PURGE_POINT
+              : FieldConstants.AimPoints.BLUE_LEFT_PURGE_POINT;
+      case NEUTRAL_RIGHT_PURGE ->
+          isRed
+              ? FieldConstants.AimPoints.RED_RIGHT_PURGE_POINT
+              : FieldConstants.AimPoints.BLUE_RIGHT_PURGE_POINT;
+      default -> isRed ? FieldConstants.Hub.RED_CENTER_POSE : FieldConstants.Hub.BLUE_CENTER_POSE;
+    };
+  }
+
+  private Translation2d getCurrentAimTarget() {
+    return resolveAimTargetForZone(allianceConfirmed, currentZone, alliance);
+  }
+
+  public Translation2d getCachedHubTarget() {
+    return getCurrentAimTarget();
+  }
+
+  private boolean isShootAllowedZone() {
+    if (!allianceConfirmed || currentZone == null) {
+      return false;
+    }
+
+    return switch (currentZone) {
+      case ALLIANCE_LEFT,
+              ALLIANCE_RIGHT,
+              NEUTRAL_LEFT_SHOOT,
+              NEUTRAL_RIGHT_SHOOT,
+              NEUTRAL_LEFT_PURGE,
+              NEUTRAL_RIGHT_PURGE ->
+          true;
+      default -> false;
+    };
+  }
+
+  private boolean isPurgeZone() {
+    if (!allianceConfirmed || currentZone == null) {
+      return false;
+    }
+
+    return switch (currentZone) {
+      case NEUTRAL_LEFT_PURGE, NEUTRAL_RIGHT_PURGE -> true;
+      default -> false;
+    };
+  }
+
+  private boolean isNeutralShootOrPurgeZone() {
+    if (!allianceConfirmed || currentZone == null) {
+      return false;
+    }
+
+    return switch (currentZone) {
+      case NEUTRAL_LEFT_SHOOT, NEUTRAL_RIGHT_SHOOT, NEUTRAL_LEFT_PURGE, NEUTRAL_RIGHT_PURGE -> true;
+      default -> false;
+    };
+  }
+
+  private Command createShootStateCommand(boolean withAim) {
+    return Commands.run(
+            () -> {
+              setDesiredSuperState(withAim ? SuperState.SHOOT_WITH_AIM : SuperState.SHOOT_NO_AIM);
+              shooter.setDesiredState(ShooterState.SHOOT);
+              if (shooter.getCurrentState() == ShooterState.SHOOT && isAlignedToTarget()) {
+                hopper.setDesiredState(HopperState.INDEXTOSHOOTER);
+              } else {
+                hopper.setDesiredState(HopperState.STOP);
+              }
+            },
+            shooter,
+            hopper)
+        .withName(withAim ? "SuperState(SHOOT_WITH_AIM)" : "SuperState(SHOOT_NO_AIM)");
+  }
+
+  private Command createPurgeStateCommand() {
+    return Commands.run(
+            () -> {
+              setDesiredSuperState(SuperState.PURGE);
+              intake.setDesiredState(IntakeState.OUTTAKE);
+              shooter.setDesiredState(ShooterState.SHOOT);
+              if (shooter.getCurrentState() == ShooterState.SHOOT && isAlignedToTarget()) {
+                hopper.setDesiredState(HopperState.INDEXTOSHOOTER);
+              } else {
+                hopper.setDesiredState(HopperState.STOP);
+              }
+            },
+            intake,
+            shooter,
+            hopper)
+        .withName("SuperState(PURGE)");
+  }
+
+  private Command createManualShootStateCommand(double shooterRpm, double hoodAngle) {
+    return Commands.run(
+            () -> {
+              shooter.setSetpoint(shooterRpm, hoodAngle);
+              setDesiredSuperState(SuperState.MANUAL_SHOOT);
+              shooter.setDesiredState(ShooterState.SHOOT);
+              if (shooter.getCurrentState() == ShooterState.SHOOT) {
+                hopper.setDesiredState(HopperState.INDEXTOSHOOTER);
+              } else {
+                hopper.setDesiredState(HopperState.STOP);
+              }
+            },
+            shooter,
+            hopper)
+        .withName("SuperState(MANUAL_SHOOT)");
+  }
+
+  public Command selectedShootModeCmd() {
+    return switch (shootMode) {
+      case DEFAULT_SHOOT_WITH_AIM -> {
+        if (!isShootAllowedZone()) {
+          yield Commands.idle().withName("SuperState(SHOOT_WITH_AIM:DISALLOWED)");
+        }
+        if (isPurgeZone()) {
+          yield createPurgeStateCommand().withName("SuperState(SHOOT_WITH_AIM->PURGE)");
+        }
+        yield createShootStateCommand(true);
+      }
+      case MANUAL_BUMPER_UP ->
+          createManualShootStateCommand(MANUAL_BUMPER_UP_RPM, MANUAL_BUMPER_UP_HOOD)
+              .withName("SuperState(SHOOT->MANUAL_BUMPER_UP)");
+      case MANUAL_TRENCH ->
+          createManualShootStateCommand(MANUAL_TRENCH_RPM, MANUAL_TRENCH_HOOD)
+              .withName("SuperState(SHOOT->MANUAL_TRENCH)");
+    };
+  }
+
+  public boolean shouldUsePurgeDuringShoot() {
+    return shootMode == ShootMode.DEFAULT_SHOOT_WITH_AIM && isPurgeZone();
+  }
+
+  public Command purgeShootCmd() {
+    if (!isPurgeZone()) {
+      return Commands.idle().withName("SuperState(SHOOT->PURGE:DISALLOWED)");
+    }
+    return createPurgeStateCommand().withName("SuperState(SHOOT->PURGE)");
+  }
+
+  private void refreshAlliance() {
     DriverStation.getAlliance()
         .ifPresent(
             dsAlliance -> {
+              boolean allianceChanged = dsAlliance != alliance;
               setAlliance(dsAlliance);
               allianceConfirmed = true;
-              Logger.recordOutput("Robot/AllianceConfirmed", dsAlliance.name());
+              if (allianceChanged) {
+                Logger.recordOutput("Superstructure/AllianceConfirmed", dsAlliance.name());
+              }
             });
   }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Heading Accessors (used by drive commands)
-  // ──────────────────────────────────────────────────────────────────────────
 
   public Optional<Rotation2d> getCurrentHeading() {
     return currentHeading;
@@ -176,22 +300,10 @@ public class Superstructure extends SubsystemBase {
     this.rotationLastTriggered = t;
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // State Commands
-  // ──────────────────────────────────────────────────────────────────────────
-
   public void setDesiredSuperState(SuperState state) {
     this.state = state;
   }
 
-  /**
-   * Returns a command that transitions relevant subsystems to the requested SuperState. Each
-   * subsystem is controlled through proper WPILib command requirements — not direct calls from
-   * periodic().
-   *
-   * <p>When the returned command ends (button released), the scheduler resumes the default commands
-   * on each required subsystem automatically.
-   */
   public Command setStateCmd(SuperState desiredState) {
     switch (desiredState) {
       case DRIVE_STARTING_CONFIG:
@@ -206,7 +318,6 @@ public class Superstructure extends SubsystemBase {
                 hopper,
                 shooter)
             .withName("SuperState(DRIVE_STARTING_CONFIG)");
-
       case DRIVE:
         return Commands.run(
                 () -> {
@@ -219,7 +330,6 @@ public class Superstructure extends SubsystemBase {
                 hopper,
                 shooter)
             .withName("SuperState(DRIVE)");
-
       case INTAKE:
         return Commands.run(
                 () -> {
@@ -232,7 +342,6 @@ public class Superstructure extends SubsystemBase {
                 hopper,
                 shooter)
             .withName("SuperState(INTAKE)");
-
       case OUTTAKE:
         return Commands.run(
                 () -> {
@@ -245,172 +354,191 @@ public class Superstructure extends SubsystemBase {
                 hopper,
                 shooter)
             .withName("SuperState(OUTTAKE)");
-
       case SHOOT:
-        return Commands.run(
-                () -> {
-                  setDesiredSuperState(SuperState.SHOOT);
-                  shooter.setDesiredState(ShooterState.SHOOT);
-                  if (manualShooterDistanceOverride) {
-                    // Override active: shoot in place
-                    if (shooter.getCurrentState() == ShooterState.SHOOT) {
-                      hopper.setDesiredState(HopperState.INDEXTOSHOOTER);
-                    } else {
-                      hopper.setDesiredState(HopperState.STOP);
-                    }
-                  } else {
-                    // Normal: require alignment before feeding
-                    if (shooter.getCurrentState() == ShooterState.SHOOT && isAlignedToTarget()) {
-                      hopper.setDesiredState(HopperState.INDEXTOSHOOTER);
-                    } else {
-                      hopper.setDesiredState(HopperState.STOP);
-                    }
-                  }
-                },
-                shooter,
-                hopper)
-            .withName("SuperState(SHOOT)");
-
+        return selectedShootModeCmd();
+      case SHOOT_WITH_AIM:
+        if (!isShootAllowedZone()) {
+          return Commands.idle().withName("SuperState(SHOOT_WITH_AIM:DISALLOWED)");
+        }
+        if (isPurgeZone()) {
+          return createPurgeStateCommand().withName("SuperState(SHOOT_WITH_AIM->PURGE)");
+        }
+        return createShootStateCommand(true);
+      case SHOOT_NO_AIM:
+        if (!isShootAllowedZone()) {
+          return Commands.idle().withName("SuperState(SHOOT_NO_AIM:DISALLOWED)");
+        }
+        return createShootStateCommand(false);
+      case MANUAL_SHOOT:
+        return createManualShootStateCommand(MANUAL_BUMPER_UP_RPM, MANUAL_BUMPER_UP_HOOD);
+      case PURGE:
+        if (!isPurgeZone()) {
+          return Commands.idle().withName("SuperState(PURGE:DISALLOWED)");
+        }
+        return createPurgeStateCommand();
       default:
         return Commands.none();
     }
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Individual Subsystem Override Commands
-  // ──────────────────────────────────────────────────────────────────────────
-
-  /** Override intake independently — preempts default, doesn't touch hopper/shooter. */
   public Command intakeOverrideCmd(IntakeState intakeState) {
     return Commands.run(() -> intake.setDesiredState(intakeState), intake)
         .withName("IntakeOverride(" + intakeState.name() + ")");
   }
 
-  /** Override hopper independently. */
   public Command hopperOverrideCmd(HopperState hopperState) {
     return Commands.runOnce(() -> hopper.setDesiredState(hopperState), hopper)
         .withName("HopperOverride(" + hopperState.name() + ")");
   }
 
-  /** Override shooter independently. */
   public Command shooterOverrideCmd(ShooterState shooterState) {
     return Commands.runOnce(() -> shooter.setDesiredState(shooterState), shooter)
         .withName("ShooterOverride(" + shooterState.name() + ")");
   }
 
+  /** Snap odometry to the latest accepted vision pose, if one is available. */
+  public Command forceReseedFromVisionCmd() {
+    return new InstantCommand(
+        () -> {
+          if (vision == null) {
+            return;
+          }
+          vision.forceReseedFromVision();
+        },
+        drive);
+  }
+
+  public ShootMode getShootMode() {
+    return shootMode;
+  }
+
+  public void setShootMode(ShootMode shootMode) {
+    this.shootMode = shootMode;
+    Logger.recordOutput("Superstructure/ShootMode", shootMode.name());
+  }
+
+  public Command setShootModeCmd(ShootMode shootMode) {
+    return Commands.runOnce(() -> setShootMode(shootMode));
+  }
+
+  public Command toggleShootModeCmd(ShootMode manualMode) {
+    return Commands.runOnce(
+        () -> {
+          ShootMode nextMode =
+              shootMode == manualMode ? ShootMode.DEFAULT_SHOOT_WITH_AIM : manualMode;
+          setShootMode(nextMode);
+        });
+  }
+
   public Command toggleManualShooterDistanceOverrideCmd() {
     return Commands.runOnce(
             () -> {
-              manualShooterDistanceOverride = !manualShooterDistanceOverride;
-              shooter.setManualDistanceOverride(manualShooterDistanceOverride);
-              Logger.recordOutput("Shooter/ManualDistanceOverride", manualShooterDistanceOverride);
+              boolean override = !shooterOverrideEnabled();
+              shooter.setManualDistanceOverride(override);
+              Logger.recordOutput("Shooter/ManualDistanceOverride", override);
             },
             shooter)
         .withName("ShooterOverride(Toggle Manual Distance Override)");
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Alignment
-  // ──────────────────────────────────────────────────────────────────────────
+  private boolean shooterOverrideEnabled() {
+    // Manual shoot modes own their setpoint; distance interpolation should be bypassed.
+    return shootMode == ShootMode.MANUAL_BUMPER_UP || shootMode == ShootMode.MANUAL_TRENCH;
+  }
 
   public boolean isAlignedToTarget() {
     return alignedToTarget;
   }
 
-  /** Zero-allocation alignment check using raw atan2 math. */
-  private void updateAlignmentStatus(Pose2d currentPose, Translation2d hubTarget) {
-    double dx = hubTarget.getX() - currentPose.getX();
-    double dy = hubTarget.getY() - currentPose.getY();
-    double targetAngleRad = Math.atan2(dy, dx);
+  static double resolveGeometricTargetHeadingRadians(Pose2d currentPose, Translation2d target) {
+    double dx = target.getX() - currentPose.getX();
+    double dy = target.getY() - currentPose.getY();
+    return Math.atan2(dy, dx);
+  }
+
+  static double resolveOperatorPerspectiveTargetHeadingRadians(
+      Pose2d currentPose, Translation2d hubTarget, DriverStation.Alliance alliance) {
+    double targetAngleRad = resolveGeometricTargetHeadingRadians(currentPose, hubTarget);
+    if (alliance == DriverStation.Alliance.Red) {
+      targetAngleRad += Math.PI;
+      targetAngleRad = Math.IEEEremainder(targetAngleRad, 2.0 * Math.PI);
+    }
+    return targetAngleRad;
+  }
+
+  static boolean isHeadingAlignedToTarget(
+      Pose2d currentPose, Translation2d target, double toleranceDegrees) {
+    double targetAngleRad = resolveGeometricTargetHeadingRadians(currentPose, target);
 
     double headingErrorRad = currentPose.getRotation().getRadians() - targetAngleRad;
     headingErrorRad = Math.IEEEremainder(headingErrorRad, 2.0 * Math.PI);
 
-    alignedToTarget = Math.abs(Math.toDegrees(headingErrorRad)) < ALIGNMENT_TOLERANCE_DEGREES;
+    return Math.abs(Math.toDegrees(headingErrorRad)) < toleranceDegrees;
   }
 
-  /**
-   * Returns the desired locked heading angle based on the current field zone and alliance. Returns
-   * empty if no lock is defined for the zone.
-   */
+  private void updateAlignmentStatus(Pose2d currentPose, Translation2d target) {
+    alignedToTarget = isHeadingAlignedToTarget(currentPose, target, ALIGNMENT_TOLERANCE_DEGREES);
+  }
+
   public Optional<Rotation2d> getZoneLockedHeading() {
     if (!allianceConfirmed || currentZone == null) {
       return Optional.empty();
     }
 
-    boolean isRed = alliance == DriverStation.Alliance.Red;
+    double leftLockDegrees = alliance == DriverStation.Alliance.Red ? 135.0 : -45.0;
+    double rightLockDegrees = alliance == DriverStation.Alliance.Red ? -135.0 : 45.0;
 
-    switch (currentZone) {
-      case ALLIANCE_LEFT, NEUTRAL_LEFT, OPPONENT_LEFT:
-        return Optional.of(
-            isRed
-                ? Rotation2d.fromDegrees(-45).rotateBy(Rotation2d.kPi)
-                : Rotation2d.fromDegrees(-45));
-      case ALLIANCE_RIGHT, NEUTRAL_RIGHT, OPPONENT_RIGHT:
-        return Optional.of(
-            isRed
-                ? Rotation2d.fromDegrees(45.0).rotateBy(Rotation2d.kPi)
-                : Rotation2d.fromDegrees(45.0));
-      default:
-        return Optional.empty();
-    }
+    return switch (currentZone) {
+      case ALLIANCE_LEFT, NEUTRAL_LEFT_SHOOT, NEUTRAL_LEFT_PURGE, NEUTRAL_LEFT, OPPONENT_LEFT ->
+          Optional.of(Rotation2d.fromDegrees(leftLockDegrees));
+      case ALLIANCE_RIGHT,
+              NEUTRAL_RIGHT_SHOOT,
+              NEUTRAL_RIGHT_PURGE,
+              NEUTRAL_RIGHT,
+              OPPONENT_RIGHT ->
+          Optional.of(Rotation2d.fromDegrees(rightLockDegrees));
+      default -> Optional.empty();
+    };
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // Hub Shift Accessors
-  // ──────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Returns true if our hub is currently active and we should be shooting. Uses the shifted
-   * (fudged) timing so fuel arrives within the active window.
-   */
   public boolean isHubActive() {
     return HubShiftUtil.getShiftedShiftInfo().active();
   }
 
-  /**
-   * Returns the time remaining in the current shift (using shifted timing). Drivers can use this to
-   * decide whether to commit to a scoring cycle.
-   */
   public double getShiftTimeRemaining() {
     return HubShiftUtil.getShiftedShiftInfo().remainingTime();
   }
 
-  /** Returns the cached hub target position (alliance-aware). */
-  public Translation2d getCachedHubTarget() {
-    return cachedHubTarget;
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Periodic — telemetry and vision reseed ONLY, no subsystem state writes
-  // ──────────────────────────────────────────────────────────────────────────
-
   @Override
   public void periodic() {
-    // ── Alliance (poll until confirmed, then never again) ──────────────
-    if (!allianceConfirmed) {
-      refreshAllianceAndCachedHubTarget();
-    }
+    refreshAlliance();
 
-    // Always compute telemetry regardless of alliance confirmation
     Pose2d currentPose = drive.getPose();
 
-    // ── Zone detection ────────────────────────────────────────────────
     if (allianceConfirmed) {
       currentZone = FieldZones.fromPose(currentPose, alliance);
-      Logger.recordOutput("Robot/Zone", ZONE_NAMES[currentZone.ordinal()]);
+      Logger.recordOutput("Superstructure/Zone", ZONE_NAMES[currentZone.ordinal()]);
     }
 
-    // ── Distance + alignment (needed by SHOOT command group) ──────────
-    if (cachedHubTarget != null) {
-      double distanceToHub = currentPose.getTranslation().getDistance(cachedHubTarget);
+    Translation2d aimTarget = getCurrentAimTarget();
+    if (aimTarget != null) {
+      double distanceToTarget = currentPose.getTranslation().getDistance(aimTarget);
       Logger.recordOutput(
-          "Superstructure/Distance to Hub (feet)", Units.metersToFeet(distanceToHub));
-      shooter.setSetpointForDistance(distanceToHub);
-      updateAlignmentStatus(currentPose, cachedHubTarget);
+          "Superstructure/Distance to Target (feet)", Units.metersToFeet(distanceToTarget));
+
+      if (state != SuperState.MANUAL_SHOOT && !shooterOverrideEnabled()) {
+        shooter.setSetpointForDistance(distanceToTarget);
+        if (isNeutralShootOrPurgeZone()) {
+          shooter.setSetpoint(shooter.getTargetRPM(), NEUTRAL_ZONE_HOOD_LOCK);
+        }
+      }
+      updateAlignmentStatus(currentPose, aimTarget);
     }
 
-    // ── Hub Shift Tracking ────────────────────────────────────────────
+    if (vision != null) {
+      vision.setAiming(state == SuperState.SHOOT_WITH_AIM || state == SuperState.SHOOT_NO_AIM);
+    }
+
     ShiftInfo officialShift = HubShiftUtil.getOfficialShiftInfo();
     ShiftInfo shiftedShift = HubShiftUtil.getShiftedShiftInfo();
 
@@ -429,5 +557,12 @@ public class Superstructure extends SubsystemBase {
 
     Logger.recordOutput("Superstructure/CurrentState", state.toString());
     Logger.recordOutput("Superstructure/IsAlignedToTarget", alignedToTarget);
+    Logger.recordOutput(
+        "Superstructure/ShootMode/DefaultShootWithAim",
+        shootMode == ShootMode.DEFAULT_SHOOT_WITH_AIM);
+    Logger.recordOutput(
+        "Superstructure/ShootMode/ManualBumperUp", shootMode == ShootMode.MANUAL_BUMPER_UP);
+    Logger.recordOutput(
+        "Superstructure/ShootMode/ManualTrench", shootMode == ShootMode.MANUAL_TRENCH);
   }
 }

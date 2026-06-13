@@ -9,7 +9,7 @@ import org.littletonrobotics.junction.AutoLog;
 /**
  * AdvantageKit IO layer for the shooter subsystem. The shooter has four motors: lead flywheel
  * (velocity control), follow flywheel (follower), kicker (duty-cycle), and hood (position control
- * with CANcoder feedback).
+ * from hood motor integrated feedback).
  */
 public interface ShooterIO {
   @AutoLog

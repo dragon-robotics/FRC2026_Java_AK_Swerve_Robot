@@ -7,13 +7,13 @@
 
 package frc.robot;
 
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
-
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -23,6 +23,7 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.Superstructure;
+import frc.robot.subsystems.Superstructure.ShootMode;
 import frc.robot.subsystems.Superstructure.SuperState;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.GyroIO;
@@ -45,11 +46,12 @@ import frc.robot.subsystems.shooter.ShooterIOSim;
 import frc.robot.subsystems.shooter.ShooterIOTalonFX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
-import static frc.robot.subsystems.vision.VisionConstants.APTAG_CAMERA_NAMES;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.constants.OperatorConstants;
+import java.util.Set;
+import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -77,6 +79,10 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+
+    /* Disable warnings */
+    DriverStation.silenceJoystickConnectionWarning(true);
+
     switch (Constants.currentMode) {
       case REAL:
         // Real robot, instantiate hardware IO implementations
@@ -92,6 +98,7 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
+                drive::setPose,
                 drive::getPose,
                 new VisionIOPhotonVision(
                     APTAG_CAMERA_NAMES[0], VisionConstants.APTAG_POSE_EST_CAM_F_POS),
@@ -118,6 +125,7 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
+                drive::setPose,
                 drive::getPose,
                 new VisionIOPhotonVisionSim(
                     APTAG_CAMERA_NAMES[0],
@@ -151,15 +159,43 @@ public class RobotContainer {
                 new ModuleIO() {});
         vision =
             new Vision(
-                drive::addVisionMeasurement, drive::getPose, new VisionIO() {}, new VisionIO() {});
+                drive::addVisionMeasurement,
+                drive::setPose,
+                drive::getPose,
+                new VisionIO() {},
+                new VisionIO() {});
         intake = new Intake(new IntakeIO() {});
         hopper = new Hopper(new HopperIO() {});
         shooter = new Shooter(new ShooterIO() {});
         break;
     }
 
+    vision.setHeadingProvider(
+        new VisionIOPhotonVision.VisionHeadingProvider() {
+          @Override
+          public java.util.Optional<Rotation2d> getHeadingAtTimestamp(double fpgaTimestampSeconds) {
+            return java.util.Optional.of(drive.getRotation());
+          }
+
+          @Override
+          public java.util.Optional<edu.wpi.first.math.geometry.Pose3d> getSeedPoseAtTimestamp(
+              double fpgaTimestampSeconds) {
+            return java.util.Optional.of(new edu.wpi.first.math.geometry.Pose3d(drive.getPose()));
+          }
+
+          @Override
+          public double getAngularRateRadPerSec() {
+            return drive.getAngularVelocityRadPerSec();
+          }
+
+          @Override
+          public double getLinearSpeedMetersPerSecond() {
+            return drive.getLinearSpeedMetersPerSec();
+          }
+        });
+
     // Create superstructure coordinator (after all subsystems are initialized)
-    superstructure = new Superstructure(drive, intake, hopper, shooter);
+    superstructure = new Superstructure(drive, intake, hopper, shooter, vision);
 
     // Register PathPlanner named commands (must be done BEFORE AutoBuilder.buildAutoChooser)
     NamedCommands.registerCommand("Intake", superstructure.setStateCmd(SuperState.INTAKE));
@@ -167,6 +203,13 @@ public class RobotContainer {
         "Shoot",
         superstructure
             .setStateCmd(SuperState.SHOOT)
+            .alongWith(
+                Commands.waitSeconds(1.5)
+                    .andThen(superstructure.intakeOverrideCmd(IntakeState.JUICER))));
+    NamedCommands.registerCommand(
+        "ShootNoAim",
+        superstructure
+            .setStateCmd(SuperState.SHOOT_NO_AIM)
             .alongWith(
                 Commands.waitSeconds(1.5)
                     .andThen(superstructure.intakeOverrideCmd(IntakeState.JUICER))));
@@ -244,19 +287,32 @@ public class RobotContainer {
         .onTrue(superstructure.setStateCmd(SuperState.OUTTAKE))
         .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
 
-    // Shoot: RT held → SHOOT state + aim at hub, released → DRIVE
-    driverController
-        .rightTrigger(0.2)
+    // Shoot: RT held → selected shoot mode + aim at target, released → DRIVE
+    var shootTrigger = driverController.rightTrigger(0.2);
+
+    shootTrigger
+        .and(superstructure::shouldUsePurgeDuringShoot)
         .whileTrue(
-            superstructure
-                .setStateCmd(SuperState.SHOOT)
+            Commands.defer(superstructure::purgeShootCmd, Set.of(intake, hopper, shooter))
                 .alongWith(
                     DriveCommands.joystickDriveAimAtTarget(
                         drive,
                         () -> -driverController.getLeftY(),
                         () -> -driverController.getLeftX(),
-                        superstructure::getCachedHubTarget)))
-        .onFalse(superstructure.setStateCmd(SuperState.DRIVE));
+                        superstructure::getCachedHubTarget)));
+
+    shootTrigger
+        .and(() -> !superstructure.shouldUsePurgeDuringShoot())
+        .whileTrue(
+            Commands.defer(superstructure::selectedShootModeCmd, Set.of(hopper, shooter))
+                .alongWith(
+                    DriveCommands.joystickDriveAimAtTarget(
+                        drive,
+                        () -> -driverController.getLeftY(),
+                        () -> -driverController.getLeftX(),
+                        superstructure::getCachedHubTarget)));
+
+    shootTrigger.onFalse(superstructure.setStateCmd(SuperState.DRIVE));
 
     // Juicer: B held → JUICER override, released → DEPLOYED
     driverController
@@ -277,11 +333,22 @@ public class RobotContainer {
         .whileTrue(superstructure.intakeOverrideCmd(IntakeState.JUICER))
         .onFalse(superstructure.intakeOverrideCmd(IntakeState.DEPLOYED));
 
-    // Toggle manual shooter distance override: operator X + A
+    // Operator reseed from latest accepted vision pose.
+    operatorController
+        .start()
+        .and(operatorController.back())
+        .onTrue(superstructure.forceReseedFromVisionCmd());
+
+    // Manual shoot mode toggles.
     operatorController
         .x()
         .and(operatorController.a())
-        .onTrue(superstructure.toggleManualShooterDistanceOverrideCmd());
+        .onTrue(superstructure.toggleShootModeCmd(ShootMode.MANUAL_BUMPER_UP));
+
+    operatorController
+        .a()
+        .and(operatorController.b())
+        .onTrue(superstructure.toggleShootModeCmd(ShootMode.MANUAL_TRENCH));
 
     // Kicker full power override: operator RB held
     operatorController
@@ -298,5 +365,14 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     return autoChooser.get();
+  }
+
+  // Test support accessors for simulation integration tests.
+  public Drive getDrive() {
+    return drive;
+  }
+
+  public Vision getVision() {
+    return vision;
   }
 }

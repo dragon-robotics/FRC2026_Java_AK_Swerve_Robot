@@ -40,18 +40,23 @@ public final class FieldConstants {
 
   public static enum FieldZones {
     ALLIANCE_LEFT,
-    // ALLIANCE_LEFT_TRENCH,
-    // ALLIANCE_LEFT_BUMP,
+    ALLIANCE_LEFT_TRENCH,
+    ALLIANCE_LEFT_BUMP,
     ALLIANCE_RIGHT,
-    // ALLIANCE_RIGHT_TRENCH,
-    // ALLIANCE_RIGHT_BUMP,
-    // ALLIANCE_TOWER,
+    ALLIANCE_RIGHT_TRENCH,
+    ALLIANCE_RIGHT_BUMP,
     NEUTRAL_LEFT,
-    // NEUTRAL_LEFT_PURGE,
+    NEUTRAL_LEFT_SHOOT,
+    NEUTRAL_LEFT_PURGE,
     NEUTRAL_RIGHT,
-    // NEUTRAL_RIGHT_PURGE,
+    NEUTRAL_RIGHT_SHOOT,
+    NEUTRAL_RIGHT_PURGE,
     OPPONENT_LEFT,
-    OPPONENT_RIGHT;
+    OPPONENT_LEFT_TRENCH,
+    OPPONENT_LEFT_BUMP,
+    OPPONENT_RIGHT,
+    OPPONENT_RIGHT_TRENCH,
+    OPPONENT_RIGHT_BUMP;
 
     public static FieldZones fromPose(Pose2d pose, DriverStation.Alliance alliance) {
       double x = pose.getX();
@@ -64,28 +69,238 @@ public final class FieldConstants {
       // Check if we're left or right
       boolean isLeft = normalizedY > LinesHorizontal.CENTER;
 
-      if (normalizedX < LinesVertical.ALLIANCE_ZONE) {
+      if (normalizedX < allianceZoneBoundaryX()) {
         return isLeft ? ALLIANCE_LEFT : ALLIANCE_RIGHT;
-      } else if (normalizedX < LinesVertical.NEUTRAL_ZONE_FAR) {
+      }
+
+      if (normalizedX < nearNeutralZoneBoundaryX()) {
+        return classifyNearNeutralZone(isLeft, normalizedY);
+      }
+
+      FieldZones neutralSpecialZone = classifyNeutralSpecialZone(normalizedX, normalizedY);
+      if (neutralSpecialZone != null) {
+        return neutralSpecialZone;
+      }
+
+      if (normalizedX < farNeutralZoneBoundaryX()) {
         return isLeft ? NEUTRAL_LEFT : NEUTRAL_RIGHT;
-      } else {
+      }
+
+      if (normalizedX > opponentAllianceZoneBoundaryX()) {
         return isLeft ? OPPONENT_LEFT : OPPONENT_RIGHT;
       }
+
+      return classifyOpponentZone(isLeft, normalizedY);
+    }
+
+    private static FieldZones classifyNeutralSpecialZone(double normalizedX, double normalizedY) {
+      if (!isWithinNeutralShootXBand(normalizedX)) {
+        return null;
+      }
+
+      if (isWithinNeutralPurgeXBand(normalizedX) && isInNeutralLeftPurgeBand(normalizedY)) {
+        return NEUTRAL_LEFT_PURGE;
+      }
+      if (isInNeutralLeftShootBand(normalizedY)) {
+        return NEUTRAL_LEFT_SHOOT;
+      }
+      if (isWithinNeutralPurgeXBand(normalizedX) && isInNeutralRightPurgeBand(normalizedY)) {
+        return NEUTRAL_RIGHT_PURGE;
+      }
+      if (isInNeutralRightShootBand(normalizedY)) {
+        return NEUTRAL_RIGHT_SHOOT;
+      }
+
+      return null;
+    }
+
+    private static boolean isWithinNeutralShootXBand(double normalizedX) {
+      return normalizedX >= neutralShootBandMinX() && normalizedX <= neutralShootBandMaxX();
+    }
+
+    private static boolean isWithinNeutralPurgeXBand(double normalizedX) {
+      return normalizedX >= neutralPurgeBandMinX() && normalizedX <= neutralPurgeBandMaxX();
+    }
+
+    private static boolean isInNeutralRightPurgeBand(double normalizedY) {
+      return normalizedY >= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_END
+          && normalizedY
+              <= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_START
+                  - SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static boolean isInNeutralRightShootBand(double normalizedY) {
+      return normalizedY >= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_END
+          && normalizedY <= LinesHorizontal.BLUE_RIGHT_BUMP_START;
+    }
+
+    private static boolean isInNeutralLeftPurgeBand(double normalizedY) {
+      return normalizedY
+              >= LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_END
+                  + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_START;
+    }
+
+    private static boolean isInNeutralLeftShootBand(double normalizedY) {
+      return normalizedY >= LinesHorizontal.BLUE_LEFT_BUMP_END
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_START;
+    }
+
+    private static double allianceZoneBoundaryX() {
+      return LinesVertical.ALLIANCE_ZONE
+          - SwerveConstants.ROBOT_CENTER_TO_CORNER_WITH_BUMPERS_METERS;
+    }
+
+    private static double nearNeutralZoneBoundaryX() {
+      return LinesVertical.NEUTRAL_ZONE_NEAR
+          + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static double neutralShootBandMinX() {
+      return LinesVertical.NEUTRAL_ZONE_NEAR
+          + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static double neutralShootBandMaxX() {
+      return LinesVertical.CENTER - SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static double neutralPurgeBandMinX() {
+      return LinesVertical.NEUTRAL_ZONE_NEAR
+          + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static double neutralPurgeBandMaxX() {
+      return (LinesVertical.NEUTRAL_ZONE_NEAR + LinesVertical.CENTER) / 2.0;
+    }
+
+    private static double farNeutralZoneBoundaryX() {
+      return LinesVertical.NEUTRAL_ZONE_FAR
+          - SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS;
+    }
+
+    private static double opponentAllianceZoneBoundaryX() {
+      return LinesVertical.OPP_ALLIANCE_ZONE
+          + SwerveConstants.ROBOT_CENTER_TO_CORNER_WITH_BUMPERS_METERS;
+    }
+
+    private static FieldZones classifyOpponentZone(boolean isLeft, double normalizedY) {
+      return isLeft
+          ? classifyOpponentLeftZone(normalizedY)
+          : classifyOpponentRightZone(normalizedY);
+    }
+
+    private static FieldZones classifyOpponentLeftZone(double normalizedY) {
+      if (normalizedY
+              > LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_END
+                  + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_START) {
+        return OPPONENT_LEFT_TRENCH;
+      }
+      if (normalizedY >= LinesHorizontal.BLUE_LEFT_BUMP_END
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_BUMP_START) {
+        return OPPONENT_LEFT_BUMP;
+      }
+      return OPPONENT_LEFT;
+    }
+
+    private static FieldZones classifyOpponentRightZone(double normalizedY) {
+      if (normalizedY >= LinesHorizontal.BLUE_RIGHT_BUMP_END
+          && normalizedY <= LinesHorizontal.BLUE_RIGHT_BUMP_START) {
+        return OPPONENT_RIGHT_BUMP;
+      }
+      if (normalizedY >= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_END
+          && normalizedY
+              <= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_START
+                  - SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS) {
+        return OPPONENT_RIGHT_TRENCH;
+      }
+      return OPPONENT_RIGHT;
+    }
+
+    private static FieldZones classifyNearNeutralZone(boolean isLeft, double normalizedY) {
+      return isLeft
+          ? classifyLeftNearNeutralZone(normalizedY)
+          : classifyRightNearNeutralZone(normalizedY);
+    }
+
+    private static FieldZones classifyLeftNearNeutralZone(double normalizedY) {
+      if (normalizedY
+              > LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_END
+                  + SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_START) {
+        return ALLIANCE_LEFT_TRENCH;
+      }
+      if (normalizedY >= LinesHorizontal.BLUE_LEFT_BUMP_END
+          && normalizedY <= LinesHorizontal.BLUE_LEFT_BUMP_START) {
+        return ALLIANCE_LEFT_BUMP;
+      }
+      return ALLIANCE_LEFT;
+    }
+
+    private static FieldZones classifyRightNearNeutralZone(double normalizedY) {
+      if (normalizedY >= LinesHorizontal.BLUE_RIGHT_BUMP_END
+          && normalizedY <= LinesHorizontal.BLUE_RIGHT_BUMP_START) {
+        return ALLIANCE_RIGHT_BUMP;
+      }
+      if (normalizedY >= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_END
+          && normalizedY
+              <= LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_START
+                  - SwerveConstants.ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS) {
+        return ALLIANCE_RIGHT_TRENCH;
+      }
+      return ALLIANCE_RIGHT;
     }
   }
 
-  // Neutral zone purge left point
-  // Neutral zone pass left point
-  // Neutral zone outtake left point
+  public static class AimPoints {
 
-  // Neutral zone purge right point
-  // Neutral zone pass right point
-  // Neutral zone outtake right point
+    public static final Translation2d BLUE_HUB_CENTER = Hub.BLUE_CENTER_POSE;
+    public static final Translation2d RED_HUB_CENTER = Hub.RED_CENTER_POSE;
 
-  // Opposing alliance zone pass to neutral zone left point
-  // Opposing alliance zone pass to alliance zone left point
-  // Opposing alliance zone pass to neutral zone right point
-  // Opposing alliance zone pass to alliance zone right point
+    private static final double BLUE_NEUTRAL_AIM_X = LinesVertical.ALLIANCE_ZONE * 0.90;
+    private static final double RED_NEUTRAL_AIM_X = FIELD_LENGTH - BLUE_NEUTRAL_AIM_X;
+
+    /* Blue */
+    public static final Translation2d BLUE_LEFT_PURGE_POINT =
+        new Translation2d(
+            BLUE_NEUTRAL_AIM_X,
+            (LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_START
+                    + LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_END)
+                / 2.0);
+    public static final Translation2d BLUE_RIGHT_PURGE_POINT =
+        new Translation2d(
+            BLUE_NEUTRAL_AIM_X,
+            (LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_START
+                    + LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_END)
+                / 2.0);
+    public static final Translation2d BLUE_LEFT_SHOOT_POINT =
+        new Translation2d(
+            BLUE_NEUTRAL_AIM_X,
+            (LinesHorizontal.BLUE_LEFT_TRENCH_OPEN_END + LinesHorizontal.CENTER) / 2.0);
+    public static final Translation2d BLUE_RIGHT_SHOOT_POINT =
+        new Translation2d(
+            BLUE_NEUTRAL_AIM_X,
+            (LinesHorizontal.BLUE_RIGHT_TRENCH_OPEN_START + LinesHorizontal.CENTER) / 2.0);
+
+    /* Red */
+    public static final Translation2d RED_LEFT_PURGE_POINT =
+        new Translation2d(
+            RED_NEUTRAL_AIM_X,
+            FIELD_WIDTH
+                - ((LinesHorizontal.RED_LEFT_TRENCH_OPEN_START
+                        + LinesHorizontal.RED_LEFT_TRENCH_OPEN_END)
+                    / 2.0));
+    public static final Translation2d RED_RIGHT_PURGE_POINT =
+        new Translation2d(RED_NEUTRAL_AIM_X, FIELD_WIDTH - RED_LEFT_PURGE_POINT.getY());
+    public static final Translation2d RED_LEFT_SHOOT_POINT =
+        new Translation2d(
+            RED_NEUTRAL_AIM_X,
+            FIELD_WIDTH
+                - ((LinesHorizontal.RED_LEFT_TRENCH_OPEN_END + LinesHorizontal.CENTER) / 2.0));
+    public static final Translation2d RED_RIGHT_SHOOT_POINT =
+        new Translation2d(RED_NEUTRAL_AIM_X, FIELD_WIDTH - RED_LEFT_SHOOT_POINT.getY());
+  }
 
   /**
    * Officially defined and relevant vertical lines found on the field (defined by X-axis offset)

@@ -313,6 +313,12 @@ public class Drive extends SubsystemBase {
     return getChassisSpeeds().omegaRadiansPerSecond;
   }
 
+  /** Returns the current linear speed magnitude in meters per second. */
+  public double getLinearSpeedMetersPerSec() {
+    ChassisSpeeds speeds = getChassisSpeeds();
+    return Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+  }
+
   /** Returns the position of each module in radians. */
   public double[] getWheelRadiusCharacterizationPositions() {
     double[] values = new double[4];

@@ -8,9 +8,7 @@ import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Seconds;
 import static edu.wpi.first.units.Units.Volts;
 
-import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
-import com.ctre.phoenix6.configs.MagnetSensorConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -18,7 +16,6 @@ import com.ctre.phoenix6.configs.VoltageConfigs;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
-import com.ctre.phoenix6.signals.SensorDirectionValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 import edu.wpi.first.math.util.Units;
@@ -32,7 +29,6 @@ public final class ShooterConstants {
   public static final int SHOOTER_KICKER_MOTOR_ID = 14;
   public static final int SHOOTER_LEAD_MOTOR_ID = 15;
   public static final int SHOOTER_FOLLOW_MOTOR_ID = 16;
-  public static final int SHOOTER_CANCODER_ID = 2;
 
   // ─── Default Setpoints ────────────────────────────────────────────────────
   public static final double SHOOTER_KICKER_DUTY_CYCLE = 1.0;
@@ -166,12 +162,4 @@ public final class ShooterConstants {
                   .withKG(0.4)
                   .withGravityType(GravityTypeValue.Elevator_Static)
                   .withStaticFeedforwardSign(StaticFeedforwardSignValue.UseClosedLoopSign));
-
-  public static final CANcoderConfiguration SHOOTER_HOOD_CANCODER_CONFIG =
-      new CANcoderConfiguration()
-          .withMagnetSensor(
-              new MagnetSensorConfigs()
-                  .withAbsoluteSensorDiscontinuityPoint(0.5)
-                  .withSensorDirection(SensorDirectionValue.CounterClockwise_Positive)
-                  .withMagnetOffset(0.0));
 }
