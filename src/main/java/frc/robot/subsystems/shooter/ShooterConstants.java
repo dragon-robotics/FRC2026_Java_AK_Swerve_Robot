@@ -125,15 +125,15 @@ public final class ShooterConstants {
           .withCurrentLimits(
               new CurrentLimitsConfigs()
                   .withStatorCurrentLimitEnable(true)
-                  .withStatorCurrentLimit(Amps.of(77))
+                  .withStatorCurrentLimit(Amps.of(80))
                   .withSupplyCurrentLimitEnable(true)
                   .withSupplyCurrentLimit(Amps.of(40))
                   .withSupplyCurrentLowerLimit(Amps.of(30))
                   .withSupplyCurrentLowerTime(Seconds.of(0.25)))
           .withVoltage(
               new VoltageConfigs()
-                  .withPeakForwardVoltage(Volts.of(11))
-                  .withPeakReverseVoltage(Volts.of(-11)))
+                  .withPeakForwardVoltage(Volts.of(12))
+                  .withPeakReverseVoltage(Volts.of(-12)))
           .withMotorOutput(
               new MotorOutputConfigs()
                   .withNeutralMode(NeutralModeValue.Coast)

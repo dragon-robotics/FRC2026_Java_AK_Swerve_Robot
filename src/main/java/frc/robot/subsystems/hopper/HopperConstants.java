@@ -24,10 +24,12 @@ public final class HopperConstants {
   public static final double HOPPER_ROLLER_DUTY_CYCLE = 1.0;
 
   // ─── TalonFX Configurations ───────────────────────────────────────────────
-  private static final double HOPPER_ROLLER_STATOR_CURRENT_LIMIT = 40.0;
-  private static final double HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT = 20.0;
+  private static final double HOPPER_ROLLER_STATOR_CURRENT_LIMIT = 50.0;
+  private static final double HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT = 40.0;
+  private static final double HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_LIMIT = 20.0;
+  private static final double HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_TIME = 0.2;
   private static final double HOPPER_ROLLER_MAX_VOLTAGE = 12.0;
-  private static final double HOPPER_ROLLER_RAMP_RATE = 0.2;
+  private static final double HOPPER_ROLLER_RAMP_RATE = 0.5;
 
   public static final TalonFXConfiguration HOPPER_ROLLER_LEAD_TALONFX_CONFIG =
       new TalonFXConfiguration()
@@ -36,7 +38,9 @@ public final class HopperConstants {
                   .withStatorCurrentLimitEnable(true)
                   .withStatorCurrentLimit(HOPPER_ROLLER_STATOR_CURRENT_LIMIT)
                   .withSupplyCurrentLimitEnable(true)
-                  .withSupplyCurrentLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT))
+                  .withSupplyCurrentLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT)
+                  .withSupplyCurrentLowerLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_LIMIT)
+                  .withSupplyCurrentLowerTime(HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_TIME))
           .withVoltage(
               new VoltageConfigs()
                   .withPeakForwardVoltage(HOPPER_ROLLER_MAX_VOLTAGE)
@@ -58,7 +62,9 @@ public final class HopperConstants {
                   .withStatorCurrentLimitEnable(true)
                   .withStatorCurrentLimit(HOPPER_ROLLER_STATOR_CURRENT_LIMIT)
                   .withSupplyCurrentLimitEnable(true)
-                  .withSupplyCurrentLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT))
+                  .withSupplyCurrentLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LIMIT)
+                  .withSupplyCurrentLowerLimit(HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_LIMIT)
+                  .withSupplyCurrentLowerTime(HOPPER_ROLLER_SUPPLY_CURRENT_LOWER_TIME))
           .withVoltage(
               new VoltageConfigs()
                   .withPeakForwardVoltage(HOPPER_ROLLER_MAX_VOLTAGE)
