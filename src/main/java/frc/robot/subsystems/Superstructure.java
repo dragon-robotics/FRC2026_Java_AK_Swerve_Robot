@@ -49,7 +49,9 @@ public class Superstructure extends SubsystemBase {
     DRIVE,
     INTAKE,
     OUTTAKE,
-    SHOOT
+    SHOOT,
+    MANUAL_SHOOT, // Shoot without aiming and distance-based adjustments if vision is or incorrect
+    PURGE,   // Purge by both shooting and outtaking at the same time
   }
 
   // ──────────────────────────────────────────────────────────────────────────

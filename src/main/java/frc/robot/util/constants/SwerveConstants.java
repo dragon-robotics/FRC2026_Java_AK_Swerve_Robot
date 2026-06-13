@@ -25,7 +25,7 @@ public final class SwerveConstants {
   public static final double HEADING_KP = 8;
   public static final double HEADING_KI = 0;
   public static final double HEADING_KD = 0.3;
-  public static final double HEADING_TOLERANCE = 0.01;
+  public static final double HEADING_TOLERANCE = Units.degreesToRadians(5);
 
   public static final double ANGLE_GEAR_RATIO = 12.8;
   public static final double DRIVE_GEAR_RATIO = 6.12;
@@ -36,6 +36,20 @@ public final class SwerveConstants {
   public static final double MAX_SPEED_METERS_PER_SECOND =
       Units.feetToMeters(MAX_SPEED_FEET_PER_SECOND);
 
+  public static final double ROBOT_WIDTH_WITH_BUMPERS_METERS = Units.inchesToMeters(33);
+  public static final double ROBOT_WIDTH_METERS = Units.inchesToMeters(27);
+  public static final double ROBOT_LENGTH_WITH_BUMPERS_METERS = Units.inchesToMeters(33);
+  public static final double ROBOT_LENGTH_METERS = Units.inchesToMeters(27);
+  public static final double ROBOT_CENTER_TO_WIDTH_METERS = ROBOT_WIDTH_METERS / 2;
+  public static final double ROBOT_CENTER_TO_WIDTH_WITH_BUMPERS_METERS =
+      ROBOT_WIDTH_WITH_BUMPERS_METERS / 2;
+  public static final double ROBOT_CENTER_TO_LENGTH_METERS = ROBOT_LENGTH_METERS / 2;
+  public static final double ROBOT_CENTER_TO_LENGTH_WITH_BUMPERS_METERS =
+      ROBOT_LENGTH_WITH_BUMPERS_METERS / 2;
+  public static final double ROBOT_CENTER_TO_CORNER_METERS =
+      Math.hypot(ROBOT_LENGTH_METERS / 2, ROBOT_WIDTH_METERS / 2);
+  public static final double ROBOT_CENTER_TO_CORNER_WITH_BUMPERS_METERS =
+      Math.hypot(ROBOT_LENGTH_WITH_BUMPERS_METERS / 2, ROBOT_WIDTH_WITH_BUMPERS_METERS / 2);
   public static final double ROBOT_MASS = (148 - 20.3) * 0.453592;
   public static final double CHASSIS_MASS = ROBOT_MASS;
   public static final Translation3d CHASSIS_CG = new Translation3d(0, 0, Units.inchesToMeters(8));
