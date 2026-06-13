@@ -40,6 +40,8 @@ public final class ShooterConstants {
 
   public static final double SHOOTER_KICKER_DUTY_CYCLE = 1.0;
   public static final double SHOOTER_KICKER_VOLTAGE = 12.0;
+  public static final double SHOOTER_KICKER_PREP_VOLTAGE =
+      6.0; // Voltage to run kicker at during prep
   public static final double SHOOTER_KICKER_RPM = 3000.0;
   public static final double SHOOTER_LEAD_DUTY_CYCLE = 1.0;
   public static final double SHOOTER_LEAD_VOLTAGE = 12.0;
@@ -159,15 +161,15 @@ public final class ShooterConstants {
           .withCurrentLimits(
               new CurrentLimitsConfigs()
                   .withStatorCurrentLimitEnable(true)
-                  .withStatorCurrentLimit(Amps.of(77))
+                  .withStatorCurrentLimit(Amps.of(80))
                   .withSupplyCurrentLimitEnable(true)
                   .withSupplyCurrentLimit(Amps.of(40))
                   .withSupplyCurrentLowerLimit(Amps.of(30))
                   .withSupplyCurrentLowerTime(Seconds.of(0.25)))
           .withVoltage(
               new VoltageConfigs()
-                  .withPeakForwardVoltage(Volts.of(11))
-                  .withPeakReverseVoltage(Volts.of(-11)))
+                  .withPeakForwardVoltage(Volts.of(12))
+                  .withPeakReverseVoltage(Volts.of(-12)))
           .withMotorOutput(
               new MotorOutputConfigs()
                   .withNeutralMode(NeutralModeValue.Coast)
